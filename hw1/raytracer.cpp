@@ -23,8 +23,8 @@ typedef struct
     Vec3f normal;               // normal of the object
     Vec3f intersectionPoint;    // intersection point of the ray and the object
     bool isIntersected = false; // if the ray intersects with the object
-    int material_id;            // material id of the object we get this from xml file
-    double t = -1.0f;           // distance between the ray's origin and the intersection point
+    int material_id;            // material id of the object we get this from xml file, probably will be used for reflection part
+    float t = -1.0f;            // distance between the ray's origin and the intersection point
 } Intersection;
 
 typedef struct
@@ -34,9 +34,7 @@ typedef struct
 
 } Ray;
 
-/** TODO
- * can be written a non returning function
- */
+// TODO can be written a non returning function
 float dotProduct(const Vec3f &a, const Vec3f &b)
 {
     float result = 0;
@@ -46,9 +44,7 @@ float dotProduct(const Vec3f &a, const Vec3f &b)
     return result;
 }
 
-/** TODO
- * can be written a non returning function
- */
+// TODO can be written a non returning function
 Vec3f scalarMulti(const Vec3f &a, const float k)
 {
     Vec3f result;
@@ -75,6 +71,7 @@ Vec3f subtract(const Vec3f &a, const Vec3f &b)
     result.z = a.z - b.z;
 
     // Check for values close to zero and round them to zero
+    // some floating point precautions
     const float epsilon = 1e-6;
     if (std::abs(result.x) < epsilon)
         result.x = 0.0f;
@@ -191,25 +188,116 @@ Ray generateRay(Camera &camera, int i, int j)
  * @param t: the distance between the ray's origin and the intersection point
  * @return: the intersection point
  */
-Vec3f getIntersectionPoint(Ray &ray, double t)
+Vec3f getIntersectionPoint(const Ray &ray, float t)
 {
     Vec3f intersectionPoint;
     intersectionPoint = add(ray.origin, scalarMulti(ray.direction, t));
     return intersectionPoint;
 }
 
+// TODO implement this function
+/*
+ * Calculate the intersection point of a ray and a triangle
+ * @param scene: the scene object
+ * @param ray: the ray
+ * @param triangle: the triangle object
+ * @return: the intersection point
+ */
 Intersection rayTriangleIntersection(const Scene &scene, const Ray &ray, const Triangle &triangle)
 {
 }
 
+/*
+ * Calculate the intersection point of a ray and a sphere
+ * @param scene: the scene object
+ * @param ray: the ray
+ * @param sphere: the sphere object
+ * @return: the intersection point
+ */
 Intersection raySphereIntersection(const Scene &scene, const Ray &ray, const Sphere &sphere)
 {
+
+    // we subtract 1 because the vertex ids start from 1
+    Vec3f sphereCenter = scene.vertex_data[sphere.center_vertex_id - 1];
+
+    // formula from the lecture slides ,all same
+    // trying to get At^2 + Bt + C = 0
+
+    // since it repeats at least 3 times make it constant
+    const Vec3f centerToEye = centerToEye; // e-c
+
+    float C = dotProduct(centerToEye, centerToEye) - (sphere.radius * sphere.radius); // C = (e-c).(e-c) - r^2
+
+    float B = 2 * dotProduct(ray.direction, centerToEye); // B = 2d.(e-c)
+
+    float A = dotProduct(ray.direction, ray.direction); // A = d.d
+
+    float discriminant = B * B - 4 * A * C;
+
+    // we got all we need to calculate the intersection point
+    Intersection point;
+
+    // there is no real solution
+    if (discriminant < 0)
+    {
+        point.isIntersected = false;
+        return point;
+    }
+
+    // add this in order to avoid unnecessary calculations
+    // not sure if I need to implement this case
+    else if (discriminant == 0)
+    {
+        float sol = -B / (2 * A);
+        point.isIntersected = true;
+        point.intersectionPoint = getIntersectionPoint(ray, sol);
+        point.t = sol;
+        point.normal = normalizeVector(subtract(point.intersectionPoint, sphereCenter));
+        point.objId = sphere.center_vertex_id;
+        point.objType = SPHERE;
+        point.material_id = sphere.material_id;
+    }
+
+    // two solutions
+    else
+    {
+        float sol1 = (-B + sqrtf(discriminant)) / (2 * A);
+        float sol2 = (-B - sqrtf(discriminant)) / (2 * A);
+
+        // we need to check which one is closer to the camera
+        float valid_sol = sol1 < sol2 ? sol1 : sol2;
+
+        point.isIntersected = true;
+        point.intersectionPoint = getIntersectionPoint(ray, valid_sol);
+        point.t = valid_sol;
+        point.normal = normalizeVector(subtract(point.intersectionPoint, sphereCenter));
+        point.objId = sphere.center_vertex_id;
+        point.objType = SPHERE;
+        point.material_id = sphere.material_id;
+    }
+
+    return point;
 }
 
+// TODO implement this function
+/*
+ * Calculate the intersection point of a ray and a mesh
+ * @param scene: the scene object
+ * @param ray: the ray
+ * @param mesh: the mesh object
+ * @return: the intersection point
+ */
 Intersection rayMeshIntersection(const Scene &scene, const Ray &ray, const Mesh &mesh)
 {
 }
 
+// TODO implement this function
+/*
+ * Calculate the optimal intersection point
+ * @param scene: the scene object
+ * @param ray: the ray
+ * @return: the optimal intersection point
+ */
 Intersection rayObjectIntersection(const Scene &scene, const Ray &ray)
 {
 }
@@ -250,11 +338,11 @@ int main(int argc, char *argv[])
             {
                 Ray myRay = generateRay(scene.cameras[cameraIndex], i, j);
 
-                // Perform ray-object intersection tests here
+                // TODO Perform ray-object intersection tests here
 
-                // Calculate shading and color for the intersection point
+                // TODO Calculate shading and color for the intersection point
 
-                // Write the color to the image buffer
+                // TODO Write the color to the image buffer
             }
         }
 
