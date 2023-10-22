@@ -8,11 +8,24 @@ using namespace std;
 
 typedef unsigned char RGB[3];
 
-// class Ray {
-//     private:
-//         Vec3f origin;
-//         Vec3f direction;
-// }
+// created obj enum to make it easier to check the type of the object
+enum obj
+{
+    TRIANGLE,
+    SPHERE,
+    MESH
+};
+
+typedef struct
+{
+    int objId;
+    obj objType;                // 0 for triangle, 1 for sphere, 2 for mesh
+    Vec3f normal;               // normal of the object
+    Vec3f intersectionPoint;    // intersection point of the ray and the object
+    bool isIntersected = false; // if the ray intersects with the object
+    int material_id;            // material id of the object we get this from xml file
+    double t = -1.0f;           // distance between the ray's origin and the intersection point
+} Intersection;
 
 typedef struct
 {
@@ -20,40 +33,6 @@ typedef struct
     Vec3f direction;
 
 } Ray;
-
-/*
- * Generate a ray from the camera
- * @param camera: the camera object (position(e), gaze(-w), up(u), near_plane(Vec4f), near_distance, image_width, image_height, image_name)
- * @param i: the i-th pixel
- * @param j: the j-th pixel
- * @return: a ray
- */
-Ray generateRay(Camera &camera, int i, int j)
-{
-    Ray ray;
-
-    // all the abbreviations are from the lecture slides s.t. l, r, s...
-
-    // Calculate the camera's local coordinate system (unit vectors)
-    Vec3f gaze = normalizeVector(camera.gaze); // -w
-    Vec3f up = normalizeVector(camera.up);
-    Vec3f right = normalizeVector(crossProduct(up, gaze)); // gives v of len 1
-
-    float l = camera.near_plane.x; // left
-    float r = camera.near_plane.y; // right
-    float b = camera.near_plane.z; // bottom
-    float t = camera.near_plane.w; // top
-
-    Vec3f m = camera.position scalarMulti(gaze, camera.near_distance); // m = e + w * d
-    Vec3f q = m + scalarMulti(right, l) + scalarMulti(up, t);            // q = m + r * u + t * v
-    
-
-    // Set the ray's origin and direction
-    ray.origin = camera.position;
-    ray.direction = normalizeVector(ray_direction);
-
-    return ray;
-}
 
 /** TODO
  * can be written a non returning function
@@ -122,7 +101,7 @@ float length(const Vec3f &a)
     return sqrt(pow(a.x, 2) + pow(a.y, 2) + pow(a.z, 2));
 }
 
-// get the normalized vector w/ length = 1
+// get the normalized vector with length = 1
 // return a new vector
 Vec3f normalizeVector(const Vec3f &a)
 {
@@ -134,7 +113,7 @@ Vec3f normalizeVector(const Vec3f &a)
     return normalized_vec;
 }
 
-// modify the current vector (more efficient)
+// modify the current vector
 void normalizeVector2(Vec3f &a)
 {
     float len = length(a);
@@ -167,6 +146,74 @@ float determinant(const float coef_matrix[3][3])
     return res;
 }
 
+/*
+ * Generate a ray from the camera
+ * @param camera: the camera object (position(e), gaze(-w), up(u), near_plane(Vec4f), near_distance, image_width, image_height, image_name)
+ * @param i: the i-th pixel
+ * @param j: the j-th pixel
+ * @return: a ray
+ */
+Ray generateRay(Camera &camera, int i, int j)
+{
+    Ray ray;
+
+    // all the abbreviations are from the lecture slides such that l, r, s...
+
+    // Calculate the camera's local coordinate system (unit vectors)
+    // we can optimize this part to avoid calculating the same thing again and again
+    Vec3f gaze = normalizeVector(camera.gaze); // -w
+    Vec3f u = normalizeVector(camera.up);
+    Vec3f v = normalizeVector(crossProduct(u, gaze)); // gives v of len 1
+
+    float l = camera.near_plane.x; // left
+    float r = camera.near_plane.y; // right
+    float b = camera.near_plane.z; // bottom
+    float t = camera.near_plane.w; // top
+
+    Vec3f m = add(camera.position, scalarMulti(gaze, camera.near_distance)); // m = e - w * d or e + gaze * d
+    Vec3f q = add(m, add(scalarMulti(u, r), scalarMulti(v, t)));             // q = m + r * u + t * v
+
+    float su = (i + 0.5) * (r - l) / camera.image_width;  // su = (i+0.5) * (r-l) / image_width
+    float sv = (j + 0.5) * (t - b) / camera.image_height; // sv = (j+0.5) * (t-b) / image_height
+
+    Vec3f s = add(q, add(scalarMulti(u, su), scalarMulti(v, -sv))); // s = q + su * u - sv * v
+
+    // Set the ray's origin and direction
+    ray.origin = camera.position;
+    ray.direction = normalizeVector(subtract(s, camera.position));
+
+    return ray;
+}
+
+/*
+ * Calculate the intersection point of a ray and a plane
+ * @param ray: the ray
+ * @param t: the distance between the ray's origin and the intersection point
+ * @return: the intersection point
+ */
+Vec3f getIntersectionPoint(Ray &ray, double t)
+{
+    Vec3f intersectionPoint;
+    intersectionPoint = add(ray.origin, scalarMulti(ray.direction, t));
+    return intersectionPoint;
+}
+
+Intersection rayTriangleIntersection(const Scene &scene, const Ray &ray, const Triangle &triangle)
+{
+}
+
+Intersection raySphereIntersection(const Scene &scene, const Ray &ray, const Sphere &sphere)
+{
+}
+
+Intersection rayMeshIntersection(const Scene &scene, const Ray &ray, const Mesh &mesh)
+{
+}
+
+Intersection rayObjectIntersection(const Scene &scene, const Ray &ray)
+{
+}
+
 int main(int argc, char *argv[])
 {
 
@@ -176,7 +223,6 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // Sample usage for reading an XML scene file
     parser::Scene scene;
 
     try
@@ -189,43 +235,34 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // The code below creates a test pattern and writes
-    // it to a PPM file to demonstrate the usage of the
-    // ppm_write function.
-    //
-    // Normally, you would be running your ray tracing
-    // code here to produce the desired image.
-
-    const RGB BAR_COLOR[8] =
-        {
-            {255, 255, 255}, // 100% White
-            {255, 255, 0},   // Yellow
-            {0, 255, 255},   // Cyan
-            {0, 255, 0},     // Green
-            {255, 0, 255},   // Magenta
-            {255, 0, 0},     // Red
-            {0, 0, 255},     // Blue
-            {0, 0, 0},       // Black
-        };
-
-    int width = 640, height = 480;
-    int columnWidth = width / 8;
-
-    unsigned char *image = new unsigned char[width * height * 3];
-
-    int i = 0;
-    for (int y = 0; y < height; ++y)
+    for (int cameraIndex = 0; cameraIndex < scene.cameras.size(); cameraIndex++)
     {
-        for (int x = 0; x < width; ++x)
-        {
-            int colIdx = x / columnWidth;
-            image[i++] = BAR_COLOR[colIdx][0];
-            image[i++] = BAR_COLOR[colIdx][1];
-            image[i++] = BAR_COLOR[colIdx][2];
-        }
-    }
+        int imageWidth = scene.cameras[cameraIndex].image_width;
+        int imageHeight = scene.cameras[cameraIndex].image_height;
 
-    write_ppm("test.ppm", image, width, height);
+        unsigned char *image = new unsigned char[imageWidth * imageHeight * 3];
+
+        // at this point we set up our camera and created space for our image
+        // now we need to loop through each pixel and generate a ray
+        for (int i = 0; i < imageHeight; i++)
+        {
+            for (int j = 0; j < imageWidth; j++)
+            {
+                Ray myRay = generateRay(scene.cameras[cameraIndex], i, j);
+
+                // Perform ray-object intersection tests here
+
+                // Calculate shading and color for the intersection point
+
+                // Write the color to the image buffer
+            }
+        }
+
+        // read the image name from the camera object and write the image to that file
+        write_ppm(scene.cameras[cameraIndex].image_name.c_str(), image, imageWidth, imageHeight);
+
+        delete[] image;
+    }
 
     return 0;
 }
