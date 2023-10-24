@@ -46,13 +46,12 @@ float dotProduct(const Vec3f &a, const Vec3f &b)
     return result;
 }
 
-// TODO can be written a non returning function
 Vec3f scalarMulti(const Vec3f &a, const float k)
 {
     Vec3f result;
-    result.x *= k;
-    result.y *= k;
-    result.z *= k;
+    result.x = a.x * k;
+    result.y = a.y * k;
+    result.z = a.z * k;
     return result;
 }
 
@@ -161,22 +160,40 @@ Ray generateRay(Camera &camera, int i, int j)
     // Calculate the camera's local coordinate system (unit vectors)
     // we can optimize this part to avoid calculating the same thing again and again
     Vec3f gaze = normalizeVector(camera.gaze); // -w
-    Vec3f u = normalizeVector(camera.up);
-    Vec3f v = normalizeVector(crossProduct(u, gaze)); // gives v of len 1
+    Vec3f u = normalizeVector(crossProduct(gaze, camera.up));
+    Vec3f v = crossProduct(u, gaze); // as gaze and u has length 1, v will also have length 1
 
     float l = camera.near_plane.x; // left
     float r = camera.near_plane.y; // right
     float b = camera.near_plane.z; // bottom
     float t = camera.near_plane.w; // top
 
-    Vec3f m = add(camera.position, scalarMulti(gaze, camera.near_distance)); // m = e - w * d or e + gaze * d
-    Vec3f q = add(m, add(scalarMulti(u, r), scalarMulti(v, t)));             // q = m + r * u + t * v
+    // Vec3f m = add(camera.position, scalarMulti(gaze, camera.near_distance)); // m = e - w * d or e + gaze * d
+    Vec3f m;
+    // m.x = camera.position.x + (gaze.x * camera.near_distance);
+    // m.y = camera.position.y + (gaze.y * camera.near_distance);
+    // m.z = camera.position.z + (gaze.z * camera.near_distance);
 
-    float su = (i + 0.5) * (r - l) / camera.image_width;  // su = (i+0.5) * (r-l) / image_width
-    float sv = (j + 0.5) * (t - b) / camera.image_height; // sv = (j+0.5) * (t-b) / image_height
+    m = add(camera.position, scalarMulti(gaze, camera.near_distance));
 
-    Vec3f s = add(q, add(scalarMulti(u, su), scalarMulti(v, -sv))); // s = q + su * u - sv * v
+    // Vec3f q = add(m, add(scalarMulti(u, r), scalarMulti(v, t)));             // q = m + r * u + t * v
 
+    Vec3f q;
+    // q.x = m.x + (u.x * l) + (v.x * t);
+    // q.y = m.y + (u.y * l) + (v.y * t);
+    // q.z = m.z + (u.z * l) + (v.z * t);
+
+    q = add(m, add(scalarMulti(u, l), scalarMulti(v, t)));
+
+    // printf("m: %f %f %f\n", m.x, m.y, m.z);
+    // printf("q: %f %f %f\n", q.x, q.y, q.z);
+
+    float su = (j + 0.5) * (r - l) / camera.image_width;  // su = (i+0.5) * (r-l) / image_width
+    float sv = (i + 0.5) * (t - b) / camera.image_height; // sv = (j+0.5) * (t-b) / image_height
+
+    Vec3f s = add(q, subtract(scalarMulti(u, su), scalarMulti(v, sv))); // s = q + su * u - sv * v
+
+    // printf("s: %f %f %f\n", s.x, s.y, s.z);
     // Set the ray's origin and direction
     ray.origin = camera.position;
     ray.direction = normalizeVector(subtract(s, camera.position));
@@ -345,6 +362,29 @@ Intersection raySphereIntersection(const Scene &scene, const Ray &ray, const Sph
  */
 Intersection rayMeshIntersection(const Scene &scene, const Ray &ray, const Mesh &mesh)
 {
+    Intersection closestIntersection, triangleIntersection;
+
+    closestIntersection.t = 1000000; // TODO: set this to the max value of float or some very high value temporarily
+
+    for (const Face &face : mesh.faces)
+    {
+        // Get the vertices of the current triangle, subtract 1 because the vertex ids start from 1
+        Vec3f a = scene.vertex_data[face.v0_id - 1];
+        Vec3f b = scene.vertex_data[face.v1_id - 1];
+        Vec3f c = scene.vertex_data[face.v2_id - 1];
+
+        // Check for intersection with the current triangle
+        // declare a new triangle with the material id and face
+        triangleIntersection = rayTriangleIntersection(scene, ray, {mesh.material_id, face});
+
+        if (triangleIntersection.isIntersected && triangleIntersection.t < closestIntersection.t)
+        {
+            closestIntersection = triangleIntersection;
+        }
+    }
+
+    // Return the closest intersection found within the mesh
+    return closestIntersection;
 }
 
 // TODO implement this function
@@ -354,35 +394,84 @@ Intersection rayMeshIntersection(const Scene &scene, const Ray &ray, const Mesh 
  * @param ray: the ray
  * @return: the optimal intersection point
  */
+
 Intersection rayObjectIntersection(const Scene &scene, const Ray &ray)
 {
+
+    // we need to loop through all the objects and find the closest intersection point
+    Intersection closestIntersection;
+    closestIntersection.t = 1000000; // TODO: set this to the max value of float or some very high value temporarily
+    int count = 0;
+    // sphere intersection
+    for (const Sphere &sphere : scene.spheres)
+    {
+        Intersection sphereIntersection = raySphereIntersection(scene, ray, sphere);
+
+        if (sphereIntersection.isIntersected && sphereIntersection.t < closestIntersection.t)
+        {
+            closestIntersection = sphereIntersection;
+        }
+    }
+
+    // triangle intersection
+    for (const Triangle &triangle : scene.triangles)
+    {
+        Intersection triangleIntersection = rayTriangleIntersection(scene, ray, triangle);
+        if (triangleIntersection.isIntersected && triangleIntersection.t < closestIntersection.t)
+        {
+            closestIntersection = triangleIntersection;
+        }
+    }
+
+    // mesh intersection
+    for (const Mesh &mesh : scene.meshes)
+    {
+        Intersection meshIntersection = rayMeshIntersection(scene, ray, mesh);
+
+        if (meshIntersection.isIntersected && meshIntersection.t < closestIntersection.t)
+        {
+            closestIntersection = meshIntersection;
+        }
+    }
+
+    printf("%s\n", closestIntersection.isIntersected ? "true" : "");
+
+    return closestIntersection;
 }
 
-int main(int argc, char *argv[])
+int main()
 {
 
-    if (argc != 2)
-    {
-        std::cerr << "Usage: " << argv[0] << " <input_scene_file.xml>" << std::endl;
-        return 1;
-    }
+    // if (argc != 2)
+    // {
+    //     std::cerr << "Usage: " << argv[0] << " <input_scene_file.xml>" << std::endl;
+    //     return 1;
+    // }
 
     parser::Scene scene;
 
-    try
-    {
-        scene.loadFromXml(argv[1]);
-    }
-    catch (const std::exception &e)
-    {
-        std::cerr << "Error loading the scene from XML: " << e.what() << std::endl;
-        return 1;
-    }
+    // try
+    // {
+    //     scene.loadFromXml(argv[1]);
+    // }
+    // catch (const std::exception &e)
+    // {
+    //     std::cerr << "Error loading the scene from XML: " << e.what() << std::endl;
+    //     return 1;
+    // }
+
+    scene.loadFromXml("inputs/mirror_spheres.xml");
+
+    std::cout << "Loaded scene from XML successfully." << std::endl;
+
+    int counter = 0;
 
     for (int cameraIndex = 0; cameraIndex < scene.cameras.size(); cameraIndex++)
     {
         int imageWidth = scene.cameras[cameraIndex].image_width;
         int imageHeight = scene.cameras[cameraIndex].image_height;
+
+        // std::cout << "Rendering image " << scene.cameras[cameraIndex].image_name << " (" << imageWidth << "x" << imageHeight << ")..." << std::endl;
 
         unsigned char *image = new unsigned char[imageWidth * imageHeight * 3];
 
@@ -394,19 +483,45 @@ int main(int argc, char *argv[])
             {
                 Ray myRay = generateRay(scene.cameras[cameraIndex], i, j);
 
-                // TODO Perform ray-object intersection tests here
+                // std::cout << "Coordinates" << i << " " << j << std::endl;
+                // Perform ray-object intersection tests here
+                Intersection intersection = rayObjectIntersection(scene, myRay);
 
-                // TODO Calculate shading and color for the intersection point
+                // if (intersection.isIntersected)
+                // {
+                //     std::cout << "Intersection at point i:" << i << " j:" << j << " counter:" << counter << std::endl;
+                //     counter++;
+                // }
 
-                // TODO Write the color to the image buffer
+                // // TODO If the ray intersects with an object, calculate the color of the pixel
+                // // implement lighting shading etc. in color function
+                // // if (intersection.isIntersected)
+                // // {
+                // // }
+
+                if (intersection.isIntersected)
+                {
+                    // Set the color to blue if there's an intersection
+                    int pixelIndex = (i * imageWidth + j) * 3;
+                    image[pixelIndex] = 0;       // Red component
+                    image[pixelIndex + 1] = 0;   // Green component
+                    image[pixelIndex + 2] = 255; // Blue component
+                }
+                else
+                {
+                    // Set a different color for pixels without intersection (e.g., white)
+                    int pixelIndex = (i * imageWidth + j) * 3;
+                    image[pixelIndex] = (unsigned char)scene.background_color.x;
+                    image[pixelIndex + 1] = (unsigned char)scene.background_color.y;
+                    image[pixelIndex + 2] = (unsigned char)scene.background_color.z;
+                }
             }
         }
-
         // read the image name from the camera object and write the image to that file
         write_ppm(scene.cameras[cameraIndex].image_name.c_str(), image, imageWidth, imageHeight);
-
         delete[] image;
     }
-
+    std::cout << "Finished rendering."
+              << "\nCounter:" << counter << std::endl;
     return 0;
 }
