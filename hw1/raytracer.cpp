@@ -8,6 +8,8 @@ using namespace std;
 
 typedef unsigned char RGB[3];
 
+#define EPSILON 0.0001
+
 // created obj enum to make it easier to check the type of the object
 enum obj
 {
@@ -22,7 +24,7 @@ typedef struct
     obj objType;                // 0 for triangle, 1 for sphere, 2 for mesh
     Vec3f normal;               // normal of the object
     Vec3f intersectionPoint;    // intersection point of the ray and the object
-    bool isIntersected = false; // if the ray intersects with the object
+    bool isIntersected = false; // if the ray intersects with the object assume it is false
     int material_id;            // material id of the object we get this from xml file, probably will be used for reflection part
     float t = -1.0f;            // distance between the ray's origin and the intersection point
 } Intersection;
@@ -205,6 +207,60 @@ Vec3f getIntersectionPoint(const Ray &ray, float t)
  */
 Intersection rayTriangleIntersection(const Scene &scene, const Ray &ray, const Triangle &triangle)
 {
+    // we will use barycentric coordinates to calculate the intersection point
+    Intersection point;
+
+    // we subtract 1 because the vertex ids start from 1
+    Vec3f a, b, c;
+
+    a = scene.vertex_data[triangle.indices.v0_id - 1];
+    b = scene.vertex_data[triangle.indices.v1_id - 1];
+    c = scene.vertex_data[triangle.indices.v2_id - 1];
+
+    // after this point I followed the lecture slides (cramer's rule)
+
+    float matrix[3][3] = {
+        {a.x - b.x, a.x - c.x, ray.direction.x},
+        {a.y - b.y, a.y - c.y, ray.direction.y},
+        {a.z - b.z, a.z - c.z, ray.direction.z}};
+
+    float A = determinant(matrix);
+
+    float beta[3][3] = {
+        {a.x - ray.origin.x, a.x - c.x, ray.direction.x},
+        {a.y - ray.origin.y, a.y - c.y, ray.direction.y},
+        {a.z - ray.origin.z, a.z - c.z, ray.direction.z}};
+
+    float gamma[3][3] = {
+        {a.x - b.x, a.x - ray.origin.x, ray.direction.x},
+        {a.y - b.y, a.y - ray.origin.y, ray.direction.y},
+        {a.z - b.z, a.z - ray.origin.z, ray.direction.z}};
+
+    float t[3][3] = {
+        {a.x - b.x, a.x - c.x, a.x - ray.origin.x},
+        {a.y - b.y, a.y - c.y, a.y - ray.origin.y},
+        {a.z - b.z, a.z - c.z, a.z - ray.origin.z}};
+
+    float beta_val = determinant(beta) / A;
+    float gamma_val = determinant(gamma) / A;
+    float t_val = determinant(t) / A;
+
+    if (t_val < 0)
+        return point;
+
+    // check if the ray intersects with the triangle
+    if (beta_val >= 0 && gamma_val >= 0 && beta_val + gamma_val <= 1)
+    {
+        point.isIntersected = true;
+        point.intersectionPoint = getIntersectionPoint(ray, t_val);
+        point.t = t_val;
+        point.normal = normalizeVector(crossProduct(subtract(b, a), subtract(c, a)));
+        point.objId = triangle.indices.v0_id;
+        point.objType = TRIANGLE;
+        point.material_id = triangle.material_id;
+    }
+
+    return point;
 }
 
 /*
