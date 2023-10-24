@@ -2,6 +2,7 @@
 #include <math.h>
 #include "parser.h"
 #include "ppm.h"
+#include "raytracer.h"
 
 using namespace parser;
 using namespace std;
@@ -36,114 +37,6 @@ typedef struct
 
 } Ray;
 
-// TODO can be written a non returning function
-float dotProduct(const Vec3f &a, const Vec3f &b)
-{
-    float result = 0;
-    result += a.x * b.x;
-    result += a.y * b.y;
-    result += a.z * b.z;
-    return result;
-}
-
-Vec3f scalarMulti(const Vec3f &a, const float k)
-{
-    Vec3f result;
-    result.x = a.x * k;
-    result.y = a.y * k;
-    result.z = a.z * k;
-    return result;
-}
-
-Vec3f add(const Vec3f &a, const Vec3f &b)
-{
-    Vec3f result;
-    result.x = a.x + b.x;
-    result.y = a.y + b.y;
-    result.z = a.z + b.z;
-    return result;
-}
-
-Vec3f subtract(const Vec3f &a, const Vec3f &b)
-{
-    Vec3f result;
-    result.x = a.x - b.x;
-    result.y = a.y - b.y;
-    result.z = a.z - b.z;
-
-    // Check for values close to zero and round them to zero
-    // some floating point precautions
-    const float epsilon = 1e-6;
-    if (std::abs(result.x) < epsilon)
-        result.x = 0.0f;
-    if (std::abs(result.y) < epsilon)
-        result.y = 0.0f;
-    if (std::abs(result.z) < epsilon)
-        result.z = 0.0f;
-
-    return result;
-}
-
-// get cross product of two vectors s.t. A X B
-Vec3f crossProduct(const Vec3f &a, const Vec3f &b)
-{
-    Vec3f result;
-    result.x = (a.y * b.z) - (a.z * b.y);
-    result.y = (a.z * b.x) - (a.x * b.z);
-    result.z = (a.x * b.y) - (a.y * b.x);
-    return result;
-}
-
-float length(const Vec3f &a)
-{
-    return sqrt(pow(a.x, 2) + pow(a.y, 2) + pow(a.z, 2));
-}
-
-// get the normalized vector with length = 1
-// return a new vector
-Vec3f normalizeVector(const Vec3f &a)
-{
-    Vec3f normalized_vec;
-    float len = length(a);
-    normalized_vec.x = a.x / len;
-    normalized_vec.y = a.y / len;
-    normalized_vec.z = a.z / len;
-    return normalized_vec;
-}
-
-// modify the current vector
-void normalizeVector2(Vec3f &a)
-{
-    float len = length(a);
-    if (len != 0.0f)
-    {
-        float invLen = 1.0f / len;
-        a.x *= invLen;
-        a.y *= invLen;
-        a.z *= invLen;
-    }
-}
-
-// Find the distance between two vectors
-float distance(const Vec3f &a, const Vec3f &b)
-{
-    float dx = b.x - a.x;
-    float dy = b.y - a.y;
-    float dz = b.z - a.z;
-    return sqrt(dx * dx + dy * dy + dz * dz);
-}
-
-// calculate the determinant of a 3x3 matrix
-float determinant(const float coef_matrix[3][3])
-{
-    float res;
-    res =
-        (coef_matrix[0][0] * (coef_matrix[1][1] * coef_matrix[2][2] - coef_matrix[1][2] * coef_matrix[2][1])) -
-        (coef_matrix[0][1] * (coef_matrix[1][0] * coef_matrix[2][2] - coef_matrix[1][2] * coef_matrix[2][0])) +
-        (coef_matrix[0][2] * (coef_matrix[1][0] * coef_matrix[2][1] - coef_matrix[1][1] * coef_matrix[2][0]));
-    return res;
-}
-
 /*
  * Generate a ray from the camera
  * @param camera: the camera object (position(e), gaze(-w), up(u), near_plane(Vec4f), near_distance, image_width, image_height, image_name)
@@ -168,32 +61,17 @@ Ray generateRay(Camera &camera, int i, int j)
     float b = camera.near_plane.z; // bottom
     float t = camera.near_plane.w; // top
 
-    // Vec3f m = add(camera.position, scalarMulti(gaze, camera.near_distance)); // m = e - w * d or e + gaze * d
-    Vec3f m;
-    // m.x = camera.position.x + (gaze.x * camera.near_distance);
-    // m.y = camera.position.y + (gaze.y * camera.near_distance);
-    // m.z = camera.position.z + (gaze.z * camera.near_distance);
-
-    m = add(camera.position, scalarMulti(gaze, camera.near_distance));
-
-    // Vec3f q = add(m, add(scalarMulti(u, r), scalarMulti(v, t)));             // q = m + r * u + t * v
-
-    Vec3f q;
-    // q.x = m.x + (u.x * l) + (v.x * t);
-    // q.y = m.y + (u.y * l) + (v.y * t);
-    // q.z = m.z + (u.z * l) + (v.z * t);
-
-    q = add(m, add(scalarMulti(u, l), scalarMulti(v, t)));
-
-    // printf("m: %f %f %f\n", m.x, m.y, m.z);
-    // printf("q: %f %f %f\n", q.x, q.y, q.z);
-
     float su = (j + 0.5) * (r - l) / camera.image_width;  // su = (i+0.5) * (r-l) / image_width
     float sv = (i + 0.5) * (t - b) / camera.image_height; // sv = (j+0.5) * (t-b) / image_height
 
-    Vec3f s = add(q, subtract(scalarMulti(u, su), scalarMulti(v, sv))); // s = q + su * u - sv * v
+    Vec3f m, q, s;
 
-    // printf("s: %f %f %f\n", s.x, s.y, s.z);
+    m = add(camera.position, scalarMulti(gaze, camera.near_distance)); // m = e - w * d or e + gaze * d
+
+    q = add(m, add(scalarMulti(u, l), scalarMulti(v, t))); // q = m + l * u + t * v
+
+    s = add(q, subtract(scalarMulti(u, su), scalarMulti(v, sv))); // s = q + su * u - sv * v
+
     // Set the ray's origin and direction
     ray.origin = camera.position;
     ray.direction = normalizeVector(subtract(s, camera.position));
@@ -214,7 +92,6 @@ Vec3f getIntersectionPoint(const Ray &ray, float t)
     return intersectionPoint;
 }
 
-// TODO implement this function
 /*
  * Calculate the intersection point of a ray and a triangle
  * @param scene: the scene object
@@ -297,7 +174,7 @@ Intersection raySphereIntersection(const Scene &scene, const Ray &ray, const Sph
     // trying to get At^2 + Bt + C = 0
 
     // since it repeats at least 3 times make it constant
-    const Vec3f centerToEye = centerToEye; // e-c
+    const Vec3f centerToEye = subtract(ray.origin, sphereCenter); // e-c
 
     float C = dotProduct(centerToEye, centerToEye) - (sphere.radius * sphere.radius); // C = (e-c).(e-c) - r^2
 
@@ -352,7 +229,6 @@ Intersection raySphereIntersection(const Scene &scene, const Ray &ray, const Sph
     return point;
 }
 
-// TODO implement this function
 /*
  * Calculate the intersection point of a ray and a mesh
  * @param scene: the scene object
@@ -387,7 +263,6 @@ Intersection rayMeshIntersection(const Scene &scene, const Ray &ray, const Mesh 
     return closestIntersection;
 }
 
-// TODO implement this function
 /*
  * Calculate the optimal intersection point
  * @param scene: the scene object
@@ -434,44 +309,36 @@ Intersection rayObjectIntersection(const Scene &scene, const Ray &ray)
         }
     }
 
-    printf("%s\n", closestIntersection.isIntersected ? "true" : "");
-
     return closestIntersection;
 }
 
-int main()
+int main(int argc, char *argv[])
 {
 
-    // if (argc != 2)
-    // {
-    //     std::cerr << "Usage: " << argv[0] << " <input_scene_file.xml>" << std::endl;
-    //     return 1;
-    // }
+    if (argc != 2)
+    {
+        std::cerr << "Usage: " << argv[0] << " <input_scene_file.xml>" << std::endl;
+        return 1;
+    }
 
     parser::Scene scene;
 
-    // try
-    // {
-    //     scene.loadFromXml(argv[1]);
-    // }
-    // catch (const std::exception &e)
-    // {
-    //     std::cerr << "Error loading the scene from XML: " << e.what() << std::endl;
-    //     return 1;
-    // }
-
-    scene.loadFromXml("inputs/mirror_spheres.xml");
+    try
+    {
+        scene.loadFromXml(argv[1]);
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "Error loading the scene from XML: " << e.what() << std::endl;
+        return 1;
+    }
 
     std::cout << "Loaded scene from XML successfully." << std::endl;
-
-    int counter = 0;
 
     for (int cameraIndex = 0; cameraIndex < scene.cameras.size(); cameraIndex++)
     {
         int imageWidth = scene.cameras[cameraIndex].image_width;
         int imageHeight = scene.cameras[cameraIndex].image_height;
-
-        // std::cout << "Rendering image " << scene.cameras[cameraIndex].image_name << " (" << imageWidth << "x" << imageHeight << ")..." << std::endl;
 
         unsigned char *image = new unsigned char[imageWidth * imageHeight * 3];
 
@@ -483,22 +350,16 @@ int main()
             {
                 Ray myRay = generateRay(scene.cameras[cameraIndex], i, j);
 
-                // std::cout << "Coordinates" << i << " " << j << std::endl;
                 // Perform ray-object intersection tests here
                 Intersection intersection = rayObjectIntersection(scene, myRay);
 
+                // TODO If the ray intersects with an object, calculate the color of the pixel
+                // implement lighting shading etc. in color function
                 // if (intersection.isIntersected)
                 // {
-                //     std::cout << "Intersection at point i:" << i << " j:" << j << " counter:" << counter << std::endl;
-                //     counter++;
                 // }
 
-                // // TODO If the ray intersects with an object, calculate the color of the pixel
-                // // implement lighting shading etc. in color function
-                // // if (intersection.isIntersected)
-                // // {
-                // // }
-
+                // this part is for testing purposes
                 if (intersection.isIntersected)
                 {
                     // Set the color to blue if there's an intersection
@@ -509,7 +370,7 @@ int main()
                 }
                 else
                 {
-                    // Set a different color for pixels without intersection (e.g., white)
+                    // Set a different color for pixels without intersection
                     int pixelIndex = (i * imageWidth + j) * 3;
                     image[pixelIndex] = (unsigned char)scene.background_color.x;
                     image[pixelIndex + 1] = (unsigned char)scene.background_color.y;
@@ -517,11 +378,11 @@ int main()
                 }
             }
         }
-        // read the image name from the camera object and write the image to that file
+
         write_ppm(scene.cameras[cameraIndex].image_name.c_str(), image, imageWidth, imageHeight);
+
         delete[] image;
     }
-    std::cout << "Finished rendering."
-              << "\nCounter:" << counter << std::endl;
+
     return 0;
 }
