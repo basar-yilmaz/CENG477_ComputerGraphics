@@ -312,6 +312,170 @@ Intersection rayObjectIntersection(const Scene &scene, const Ray &ray)
     return closestIntersection;
 }
 
+/*
+ * Calculate the ambient shading
+ * @param scene: the scene object
+ * @param inter: the intersection point
+ * @param material: the material object
+ * @return: the ambient shading radiance
+ */
+Vec3f ambientShading(const Scene &scene, const Intersection &inter, const Material &material)
+{
+    // all the abrevation from slides
+    // outgoing radiance = k_a(coefficient) * I_a(ambient light intensity)
+
+    Vec3f ambientCoef = material.ambient;
+    Vec3f ambientLight = scene.ambient_light;
+
+    Vec3f radiance = multiplyVectors(ambientCoef, ambientLight);
+
+    return radiance;
+}
+
+Vec3f diffuseShading(const Scene &scene, const PointLight &light, const Intersection &inter, const Material &material)
+{
+    // all the abrevation from slides
+    // outgoing radiance = k_d(coefficient) * max(0, w_i.n)(cos approx) * I(light intensity) / r^2(light distance) (inverse square law)
+    Vec3f lightDirection, normal, diffuseCoef, radiance;
+
+    lightDirection = subtract(light.position, inter.intersectionPoint); // w_i
+    normal = inter.normal;
+    diffuseCoef = material.diffuse;
+
+    double r = length(lightDirection);
+
+    // Normalize the light direction vector
+    lightDirection = normalizeVector(lightDirection);
+
+    radiance = scalarMulti(diffuseCoef, max(dotProduct(lightDirection, normal), 0.0f)); // outgoing radiance
+
+    return radiance;
+}
+
+/*
+ * Calculate the specular shading
+ * @param scene: the scene object
+ * @param light: the light object
+ * @param inter: the intersection point
+ * @param material: the material object
+ * @param camera: the camera object (differs from ambient and diffuse shading)
+ * as the specular shading depends on the view direction
+ * @return: the specular shading radiance
+ */
+Vec3f specularShading(const Scene &scene, const PointLight &light, const Intersection &inter, const Material &material, const Camera &camera)
+{
+    // radiance = k_s * max(0, n.h)^p * E_i(x, w_i)(received radiance)
+    Vec3f specularCoef, lightDirection, cameraDirection, normal, halfVector, receivedRadiance, radiance;
+
+    specularCoef = material.specular;
+    lightDirection = subtract(light.position, inter.intersectionPoint);
+    cameraDirection = normalizeVector((camera.position, inter.intersectionPoint));
+    normal = inter.normal;
+
+    double r = length(lightDirection);
+
+    // we need to calculate received radiance
+    receivedRadiance = scalarDivision(light.intensity, r);
+
+    lightDirection = normalizeVector(lightDirection);
+
+    halfVector = normalizeVector(add(lightDirection, cameraDirection));
+
+    radiance = (scalarMulti(specularCoef, pow(max(dotProduct(normal, halfVector), 0.0f), material.phong_exponent)));
+
+    radiance = multiplyVectors(radiance, receivedRadiance);
+
+    return radiance;
+}
+
+/*
+ * Calculate the color of the pixel
+ * @param scene: the scene object
+ * @param intersection: the intersection point
+ * @param recDepth: the recursion depth
+ * @return: the color of the pixel
+ */
+Vec3f coloring(const Scene &scene, const Intersection &intersection, int recDepth, const Camera &camera)
+{
+    Vec3f color = {0, 0, 0};
+
+    if (intersection.isIntersected)
+    {
+
+        int materialId = intersection.material_id;
+
+        color = ambientShading(scene, intersection, scene.materials[materialId - 1]); // color so far we get from only ambient light
+
+        for (PointLight light : scene.point_lights)
+        {
+            int isShadow = 0;
+
+            // calculate the shadowray and check if it intersects with any object
+            Vec3f shadowRayDirection = normalizeVector(subtract(light.position, intersection.intersectionPoint));
+            Ray shadowRay = {intersection.intersectionPoint, shadowRayDirection};
+            Intersection shadowRayIntersection = rayObjectIntersection(scene, shadowRay);
+
+            // if the shadow ray intersects with an object, we need to check if the intersection point is behind the light source
+            if (shadowRayIntersection.isIntersected)
+            {
+                Vec3f shadowRayIntersectionPoint = shadowRayIntersection.intersectionPoint;
+                Vec3f lightToIntersection = subtract(shadowRayIntersectionPoint, light.position);
+                float distanceToLight = length(lightToIntersection);
+                float distanceToIntersection = length(subtract(shadowRayIntersectionPoint, intersection.intersectionPoint));
+                if (distanceToIntersection < distanceToLight)
+                {
+                    isShadow = 1;
+                }
+            }
+
+            if (!isShadow)
+            {
+                Vec3f lightDirection = normalizeVector(subtract(light.position, intersection.intersectionPoint));
+                Vec3f normal = intersection.normal;
+
+                // Compute and add diffuse shading
+                Vec3f diffuseColor = diffuseShading(scene, light, intersection, scene.materials[materialId - 1]);
+                color = add(color, diffuseColor);
+
+                // Compute and add specular shading
+                Vec3f specularColor = specularShading(scene, light, intersection, scene.materials[materialId - 1], camera);
+                color = add(color, specularColor);
+            }
+        }
+
+        Vec3f reflection;
+
+        // at this point we processed the light yet there might be reflections so we need to check the recursion depth
+        if (recDepth > 0 && recDepth < 5 && scene.materials[materialId - 1].is_mirror)
+        {
+            // we will use ideal specular reflection (mirrors) from slides
+            // w_r = -w_o + 2ncos() = -w_o + 2n(w_o.n)
+            Vec3f w_o, n, w_r, k_m, reflectedColor;
+            w_o = normalizeVector(subtract(camera.position, intersection.intersectionPoint));
+            k_m = scene.materials[materialId - 1].mirror; // reflectence coeffecient
+            n = intersection.normal;
+
+            w_r = add(scalarMulti(w_o, -1), scalarMulti(scalarMulti(n, 2), dotProduct(n, w_o)));
+
+            w_r = scalarMulti(w_r, scene.shadow_ray_epsilon);
+
+            Ray reflectionRay = {intersection.intersectionPoint, w_r};
+
+            Intersection reflectionIntersection = rayObjectIntersection(scene, reflectionRay);
+
+            // TODO implement the recursion part
+        }
+    }
+
+    else
+    {
+        color.x = min(scene.background_color.x, 255);
+        color.y = min(scene.background_color.y, 255);
+        color.z = min(scene.background_color.z, 255);
+    }
+    return color;
+}
+
 int main(int argc, char *argv[])
 {
 
