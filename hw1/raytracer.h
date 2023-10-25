@@ -23,6 +23,15 @@ float dotProduct(const Vec3f &a, const Vec3f &b)
     return result;
 }
 
+Vec3f scalarDivision(const Vec3f &a, const double k)
+{
+    Vec3f result;
+    result.x = a.x / k;
+    result.y = a.y / k;
+    result.z = a.z / k;
+    return result;
+}
+
 Vec3f scalarMulti(const Vec3f &a, const float k)
 {
     Vec3f result;
@@ -73,7 +82,7 @@ Vec3f crossProduct(const Vec3f &a, const Vec3f &b)
 
 float length(const Vec3f &a)
 {
-    return sqrt(pow(a.x, 2) + pow(a.y, 2) + pow(a.z, 2));
+    return sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
 }
 
 // get the normalized vector with length = 1
@@ -119,4 +128,13 @@ float determinant(const float coef_matrix[3][3])
         (coef_matrix[0][1] * (coef_matrix[1][0] * coef_matrix[2][2] - coef_matrix[1][2] * coef_matrix[2][0])) +
         (coef_matrix[0][2] * (coef_matrix[1][0] * coef_matrix[2][1] - coef_matrix[1][1] * coef_matrix[2][0]));
     return res;
+}
+
+Vec3f multiplyVectors(Vec3f &a, Vec3f &b)
+{
+    Vec3f result;
+    result.x = a.x * b.x;
+    result.y = a.y * b.y;
+    result.z = a.z * b.z;
+    return result;
 }
