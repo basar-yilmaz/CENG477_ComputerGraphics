@@ -510,7 +510,6 @@ int main(int argc, char *argv[])
     }
 
     parser::Scene scene;
-    // int numberOfCameras = scene.cameras.size();
 
     try
     {
@@ -538,16 +537,11 @@ int main(int argc, char *argv[])
             for (int j = 0; j < imageWidth; j++)
             {
                 Ray myRay = generateRay(scene.cameras[cameraIndex], i, j);
-
-                printf("i: %d, j: %d\n", i, j);
+                if (i % 10 == 0)
+                    printf("i: %d, j: %d\n", i, j);
                 // Perform ray-object intersection tests here
                 Intersection intersection = rayObjectIntersection(scene, myRay);
 
-                // TODO If the ray intersects with an object, calculate the color of the pixel
-                // implement lighting shading etc. in color function
-                // if (intersection.isIntersected)
-                // {
-                // }
                 Vec3f color = coloring(scene, intersection, scene.max_recursion_depth, scene.cameras[cameraIndex]);
                 if (color.x > 255)
                     image[pixelIndex] = 255;
@@ -562,23 +556,6 @@ int main(int argc, char *argv[])
                 else
                     image[pixelIndex + 2] = round(color.z);
                 pixelIndex += 3;
-                // this part is for testing purposes
-                /*if (intersection.isIntersected)
-                {
-                    // Set the color to blue if there's an intersection
-                    int pixelIndex = (i * imageWidth + j) * 3;
-                    image[pixelIndex] = 0;       // Red component
-                    image[pixelIndex + 1] = 0;   // Green component
-                    image[pixelIndex + 2] = 255; // Blue component
-                }
-                else
-                {
-                    // Set a different color for pixels without intersection
-                    int pixelIndex = (i * imageWidth + j) * 3;
-                    image[pixelIndex] = (unsigned char)scene.background_color.x;
-                    image[pixelIndex + 1] = (unsigned char)scene.background_color.y;
-                    image[pixelIndex + 2] = (unsigned char)scene.background_color.z;
-                }*/
             }
         }
 
