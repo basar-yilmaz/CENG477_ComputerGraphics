@@ -11,7 +11,7 @@
 #include "parser.h"
 
 using parser::Vec3f;
-#define EPSILON 1e-3
+#define EPSILON 1e-6 // TODO find an optimal epsilon value
 
 float dotProduct(const Vec3f &a, const Vec3f &b)
 {

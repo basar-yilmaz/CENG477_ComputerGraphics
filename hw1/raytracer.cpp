@@ -134,7 +134,7 @@ Intersection rayTriangleIntersection(const Scene &scene, const Ray &ray, const T
                                    {a.y - ray.origin.y, a.y - c.y, ray.direction.y},
                                    {a.z - ray.origin.z, a.z - c.z, ray.direction.z}};
     beta_val = determinant(coef_matrixBeta) / determinantA;
-    if ((beta_val < EPSILON) || (beta_val > (1.f - gamma_val) - EPSILON))
+    if ((beta_val < EPSILON) || (beta_val + gamma_val > 1.f - EPSILON))
         return intersectionPoint;
 
     // calculations for t
