@@ -11,20 +11,18 @@
 #include "parser.h"
 
 using parser::Vec3f;
+#define EPSILON  1e-3
 
-float dotProduct(const Vec3f &a, const Vec3f &b)
+float dotProduct(const Vec3f& a, const Vec3f& b)
 {
-    float result = 0;
-    result += a.x * b.x;
-    result += a.y * b.y;
-    result += a.z * b.z;
-
-    printf("dot product: %f\n", result);
-    return result;
+    float result = a.x * b.x + a.y * b.y + a.z * b.z;
+    return (std::abs(result) < EPSILON) ? 0.0f : result;
 }
 
-Vec3f scalarDivision(const Vec3f &a, const double k)
+Vec3f scalarDivision(const Vec3f& a, const double k)
 {
+    if (std::abs(k) < EPSILON)
+        return Vec3f{ 0, 0, 0 };  // or some error handling
     Vec3f result;
     result.x = a.x / k;
     result.y = a.y / k;
@@ -91,17 +89,25 @@ Vec3f normalizeVector(const Vec3f &a)
 {
     Vec3f normalized_vec;
     float len = length(a);
-    normalized_vec.x = a.x / len;
-    normalized_vec.y = a.y / len;
-    normalized_vec.z = a.z / len;
-    return normalized_vec;
+    if (len > EPSILON)
+    {
+        normalized_vec.x = a.x / len;
+        normalized_vec.y = a.y / len;
+        normalized_vec.z = a.z / len;
+        return normalized_vec;
+	}
+    else
+    {
+		return a;
+	}
+
 }
 
 // modify the current vector
 void normalizeVector2(Vec3f &a)
 {
     float len = length(a);
-    if (len != 0.0f)
+    if (len > EPSILON)
     {
         float invLen = 1.0f / len;
         a.x *= invLen;
