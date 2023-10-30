@@ -1,9 +1,12 @@
 #include <iostream>
 #include <math.h>
+#include <limits>
+#include <thread>
+#include <vector>
 #include "parser.h"
 #include "ppm.h"
 #include "raytracer.h"
-#include <limits>
+#include <chrono>
 
 using namespace parser;
 using namespace std;
@@ -43,7 +46,7 @@ typedef struct
  * @param j: the j-th pixel
  * @return: a ray
  */
-Ray generateRay(Camera &camera, int i, int j)
+Ray generateRay(const Camera &camera, int i, int j)
 {
     Ray ray;
 
@@ -500,9 +503,34 @@ Vec3f coloring(const Scene &scene, const Intersection &intersection, int recDept
     return color;
 }
 
+// Define a function to render a section of the image
+void renderSection(unsigned char *image, int startRow, int endRow, int imageWidth, const Camera &camera, const Scene &scene)
+{
+    for (int i = startRow; i < endRow; i++)
+    {
+        for (int j = 0; j < imageWidth; j++)
+        {
+            // Generate the ray for this pixel
+            Ray myRay = generateRay(camera, i, j);
+
+
+            // Perform ray-object intersection tests here
+            Intersection intersection = rayObjectIntersection(scene, myRay);
+
+            // Calculate color
+            Vec3f color = coloring(scene, intersection, scene.max_recursion_depth, camera);
+
+            // Update the image buffer
+            int pixelIndex = (i * imageWidth + j) * 3;
+            image[pixelIndex] = static_cast<unsigned char>(color.x);
+            image[pixelIndex + 1] = static_cast<unsigned char>(color.y);
+            image[pixelIndex + 2] = static_cast<unsigned char>(color.z);
+        }
+    }
+}
+
 int main(int argc, char *argv[])
 {
-
     if (argc != 2)
     {
         std::cerr << "Usage: " << argv[0] << " <input_scene_file.xml>" << std::endl;
@@ -521,43 +549,40 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    std::cout << "Loaded scene from XML successfully." << std::endl;
-
     for (int cameraIndex = 0; cameraIndex < scene.cameras.size(); cameraIndex++)
     {
         int imageWidth = scene.cameras[cameraIndex].image_width;
         int imageHeight = scene.cameras[cameraIndex].image_height;
-
         unsigned char *image = new unsigned char[imageWidth * imageHeight * 3];
-        int pixelIndex = 0;
-        // at this point we set up our camera and created space for our image
-        // now we need to loop through each pixel and generate a ray
-        for (int i = 0; i < imageHeight; i++)
-        {
-            for (int j = 0; j < imageWidth; j++)
-            {
-                Ray myRay = generateRay(scene.cameras[cameraIndex], i, j);
-                if (i % 10 == 0)
-                    printf("i: %d, j: %d\n", i, j);
-                // Perform ray-object intersection tests here
-                Intersection intersection = rayObjectIntersection(scene, myRay);
 
-                Vec3f color = coloring(scene, intersection, scene.max_recursion_depth, scene.cameras[cameraIndex]);
-                if (color.x > 255)
-                    image[pixelIndex] = 255;
-                else
-                    image[pixelIndex] = round(color.x);
-                if (color.y > 255)
-                    image[pixelIndex + 1] = 255;
-                else
-                    image[pixelIndex + 1] = round(color.y);
-                if (color.z > 255)
-                    image[pixelIndex + 2] = 255;
-                else
-                    image[pixelIndex + 2] = round(color.z);
-                pixelIndex += 3;
-            }
+        // Start the timer
+        auto start_time = std::chrono::high_resolution_clock::now();
+
+        // Define the number of threads you want to use
+        int numThreads = std::thread::hardware_concurrency();
+        std::vector<std::thread> threads;
+
+        // Divide the image into sections for parallel rendering
+        int sectionHeight = imageHeight / numThreads;
+        for (int i = 0; i < numThreads; i++)
+        {
+            int startRow = i * sectionHeight;
+            int endRow = (i == numThreads - 1) ? imageHeight : startRow + sectionHeight;
+            threads.emplace_back(renderSection, image, startRow, endRow, imageWidth, scene.cameras[cameraIndex], scene);
         }
+
+        // Wait for all threads to finish
+        for (auto &thread : threads)
+        {
+            thread.join();
+        }
+
+        // Measure the end time
+        auto end_time = std::chrono::high_resolution_clock::now();
+
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+
+        std::cout << "Raytracing time for camera " << cameraIndex << ": " << duration.count() << " milliseconds" << std::endl;
 
         write_ppm(scene.cameras[cameraIndex].image_name.c_str(), image, imageWidth, imageHeight);
 
