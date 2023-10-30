@@ -101,7 +101,7 @@ Vec3f getIntersectionPoint(const Ray &ray, float t)
  * @param triangle: the triangle object
  * @return: the intersection point
  */
-Intersection rayTriangleIntersection(const Scene &scene, const Ray &ray, const Triangle &triangle)
+Intersection rayTriangleIntersection(const Scene &scene, const Ray &ray, const Triangle &triangle, bool backFaceCulling)
 {
     // we will use barycentric coordinates to calculate the intersection point
     Intersection intersectionPoint;
@@ -109,6 +109,19 @@ Intersection rayTriangleIntersection(const Scene &scene, const Ray &ray, const T
     Vec3f a = scene.vertex_data[triangle.indices.v0_id - 1];
     Vec3f b = scene.vertex_data[triangle.indices.v1_id - 1];
     Vec3f c = scene.vertex_data[triangle.indices.v2_id - 1];
+
+    // calculate triangles normal for backface culling
+    Vec3f edge1 = subtract(b, a);
+    Vec3f edge2 = subtract(c, a);
+    Vec3f triangleNormal = normalizeVector(crossProduct(edge1, edge2));
+
+    // check if the triangle is facing the camera
+    float dot_product = dotProduct(ray.direction, triangleNormal);
+
+    if (backFaceCulling && dot_product > 0.f)
+    {
+        return intersectionPoint;
+    }
 
     // we'll use cramer's rule to calculate the intersection point
     // full formula is in the slides
@@ -258,7 +271,7 @@ Intersection rayMeshIntersection(const Scene &scene, const Ray &ray, const Mesh 
 
         // Check for intersection with the current triangle
         // declare a new triangle with the material id and face
-        triangleIntersection = rayTriangleIntersection(scene, ray, {mesh.material_id, face});
+        triangleIntersection = rayTriangleIntersection(scene, ray, {mesh.material_id, face}, true);
 
         if (triangleIntersection.isIntersected && triangleIntersection.t < closestIntersection.t)
         {
@@ -277,7 +290,7 @@ Intersection rayMeshIntersection(const Scene &scene, const Ray &ray, const Mesh 
  * @return: the optimal intersection point
  */
 
-Intersection rayObjectIntersection(const Scene &scene, const Ray &ray)
+Intersection rayObjectIntersection(const Scene &scene, const Ray &ray, bool backFaceCulling)
 {
 
     // we need to loop through all the objects and find the closest intersection point
@@ -298,7 +311,7 @@ Intersection rayObjectIntersection(const Scene &scene, const Ray &ray)
     // triangle intersection
     for (const Triangle &triangle : scene.triangles)
     {
-        Intersection triangleIntersection = rayTriangleIntersection(scene, ray, triangle);
+        Intersection triangleIntersection = rayTriangleIntersection(scene, ray, triangle, backFaceCulling);
         if (triangleIntersection.isIntersected && triangleIntersection.t < closestIntersection.t)
         {
             closestIntersection = triangleIntersection;
@@ -423,7 +436,7 @@ Vec3f coloring(const Scene &scene, const Intersection &intersection, int recDept
             Vec3f shadowRayDirection = normalizeVector(subtract(light.position, intersection.intersectionPoint));
             Vec3f offset = scalarMulti(intersection.normal, scene.shadow_ray_epsilon);
             Ray shadowRay = {add(intersection.intersectionPoint, offset), shadowRayDirection};
-            Intersection shadowRayIntersection = rayObjectIntersection(scene, shadowRay);
+            Intersection shadowRayIntersection = rayObjectIntersection(scene, shadowRay, false);
 
             // if the shadow ray intersects with an object, we need to check if the intersection point is behind the light source
             if (shadowRayIntersection.isIntersected)
@@ -478,7 +491,7 @@ Vec3f coloring(const Scene &scene, const Intersection &intersection, int recDept
             ref_epsilon.z = normal_ref.z * scene.shadow_ray_epsilon;
 
             Ray reflectionRay = {add(intersection.intersectionPoint, ref_epsilon), normal_ref};
-            Intersection intRes = rayObjectIntersection(scene, reflectionRay);
+            Intersection intRes = rayObjectIntersection(scene, reflectionRay, false);
 
             if (!(intRes.objId == intersection.objId && intRes.objType == intersection.objType))
             {
@@ -513,9 +526,8 @@ void renderSection(unsigned char *image, int startRow, int endRow, int imageWidt
             // Generate the ray for this pixel
             Ray myRay = generateRay(camera, i, j);
 
-
             // Perform ray-object intersection tests here
-            Intersection intersection = rayObjectIntersection(scene, myRay);
+            Intersection intersection = rayObjectIntersection(scene, myRay, true);
 
             // Calculate color
             Vec3f color = coloring(scene, intersection, scene.max_recursion_depth, camera);
