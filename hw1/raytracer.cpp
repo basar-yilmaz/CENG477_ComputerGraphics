@@ -13,6 +13,8 @@ using namespace std;
 
 typedef unsigned char RGB[3];
 
+#define EPSILON 1e-6
+
 // created obj enum to make it easier to check the type of the object
 enum obj
 {
@@ -110,7 +112,7 @@ Intersection rayTriangleIntersection(const Scene &scene, const Ray &ray, const T
     Vec3f b = scene.vertex_data[triangle.indices.v1_id - 1];
     Vec3f c = scene.vertex_data[triangle.indices.v2_id - 1];
 
-    // calculate triangles normal for backface culling
+    // calculate triangles normal for back face culling
     Vec3f edge1 = subtract(b, a);
     Vec3f edge2 = subtract(c, a);
     Vec3f triangleNormal = normalizeVector(crossProduct(edge1, edge2));
@@ -134,7 +136,7 @@ Intersection rayTriangleIntersection(const Scene &scene, const Ray &ray, const T
     // we will move if by if inorder to avoid unnecessary calculations
     determinantA = determinant(coef_matrixA);
 
-    if (determinantA < EPSILON && determinantA > -EPSILON)
+    if (std::abs(determinantA) < EPSILON)
         return intersectionPoint;
 
     // calculations for gamma
@@ -142,7 +144,7 @@ Intersection rayTriangleIntersection(const Scene &scene, const Ray &ray, const T
                                     {a.y - b.y, a.y - ray.origin.y, ray.direction.y},
                                     {a.z - b.z, a.z - ray.origin.z, ray.direction.z}};
     gamma_val = determinant(coef_matrixGamma) / determinantA;
-    if (gamma_val < -EPSILON || (gamma_val > (1.f - EPSILON)))
+    if (gamma_val < -EPSILON || (gamma_val > 1.f))
         return intersectionPoint;
 
     // calculations for beta
@@ -150,7 +152,7 @@ Intersection rayTriangleIntersection(const Scene &scene, const Ray &ray, const T
                                    {a.y - ray.origin.y, a.y - c.y, ray.direction.y},
                                    {a.z - ray.origin.z, a.z - c.z, ray.direction.z}};
     beta_val = determinant(coef_matrixBeta) / determinantA;
-    if ((beta_val < EPSILON) || (beta_val + gamma_val > 1.f - EPSILON))
+    if ((beta_val < -EPSILON) || (beta_val + gamma_val > 1.f))
         return intersectionPoint;
 
     // calculations for t
@@ -158,7 +160,7 @@ Intersection rayTriangleIntersection(const Scene &scene, const Ray &ray, const T
                                 {a.y - b.y, a.y - c.y, a.y - ray.origin.y},
                                 {a.z - b.z, a.z - c.z, a.z - ray.origin.z}};
     t_val = determinant(coef_matrixT) / determinantA;
-    if (t_val <= EPSILON)
+    if (t_val <= 0.0)
         return intersectionPoint;
 
     // at this point we are sure that ray intersects with the triangle
@@ -273,7 +275,9 @@ Intersection rayMeshIntersection(const Scene &scene, const Ray &ray, const Mesh 
         // declare a new triangle with the material id and face
         triangleIntersection = rayTriangleIntersection(scene, ray, {mesh.material_id, face}, true);
 
-        if (triangleIntersection.isIntersected && triangleIntersection.t < closestIntersection.t)
+        if (triangleIntersection.isIntersected &&
+            triangleIntersection.t >= 0 &&
+            triangleIntersection.t < closestIntersection.t)
         {
             closestIntersection = triangleIntersection;
         }
