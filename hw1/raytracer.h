@@ -130,7 +130,7 @@ float determinant(const float coef_matrix[3][3])
 //   A float representing the determinant of the matrix.
 float determinantA(const Vec3f &v0, const Vec3f &v1, const Vec3f &v2)
 {
-    float det = v0.x * (v1.y * v2.z - v2.y * v1.z) -
+    float det = v0.x * (v1.y * v2.z - v2.y * v1.z) +
                 v0.y * (v2.x * v1.z - v1.x * v2.z) +
                 v0.z * (v1.x * v2.y - v1.y * v2.x);
     return det;
