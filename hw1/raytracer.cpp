@@ -13,8 +13,6 @@ using namespace std;
 
 typedef unsigned char RGB[3];
 
-#define EPSILON 1e-6
-
 // created obj enum to make it easier to check the type of the object
 enum obj
 {
@@ -103,74 +101,87 @@ Vec3f getIntersectionPoint(const Ray &ray, float t)
  * @param triangle: the triangle object
  * @return: the intersection point
  */
-Intersection rayTriangleIntersection(const Scene &scene, const Ray &ray, const Triangle &triangle, bool backFaceCulling)
+Intersection rayTriangleIntersection(const Ray &ray, const Vec3f &a, const Vec3f &b, const Vec3f &c, int material_id, int obj_id, bool backFaceCulling)
 {
-    // we will use barycentric coordinates to calculate the intersection point
     Intersection intersectionPoint;
 
-    Vec3f a = scene.vertex_data[triangle.indices.v0_id - 1];
-    Vec3f b = scene.vertex_data[triangle.indices.v1_id - 1];
-    Vec3f c = scene.vertex_data[triangle.indices.v2_id - 1];
-
-    // calculate triangles normal for back face culling
-    Vec3f edge1 = subtract(b, a);
-    Vec3f edge2 = subtract(c, a);
-    Vec3f triangleNormal = normalizeVector(crossProduct(edge1, edge2));
-
-    // check if the triangle is facing the camera
-    float dot_product = dotProduct(ray.direction, triangleNormal);
-
-    if (backFaceCulling && dot_product > 0.f)
+    // back face culling implementation
+    if (backFaceCulling)
     {
-        return intersectionPoint;
+        Vec3f normal = normalizeVector(crossProduct(subtract(a, b), subtract(a, c)));
+
+        // check if the triangle is facing the camera
+        if (dotProduct(normal, ray.direction) > 0.f)
+        {
+            return intersectionPoint;
+        }
     }
 
-    // we'll use cramer's rule to calculate the intersection point
-    // full formula is in the slides
-    float determinantA, t_val, gamma_val, beta_val;
+    float detA, t_val, gamma_val, beta_val;
 
     float coef_matrixA[3][3] = {{a.x - b.x, a.x - c.x, ray.direction.x},
                                 {a.y - b.y, a.y - c.y, ray.direction.y},
                                 {a.z - b.z, a.z - c.z, ray.direction.z}};
 
-    // we will move if by if inorder to avoid unnecessary calculations
-    determinantA = determinant(coef_matrixA);
+    // we will move step by step in order to avoid unnecessary calculations
 
-    if (std::abs(determinantA) < EPSILON)
+    // check detA
+    detA = determinantA({coef_matrixA[0][0], coef_matrixA[1][0], coef_matrixA[2][0]},
+                        {coef_matrixA[0][1], coef_matrixA[1][1], coef_matrixA[2][1]},
+                        {coef_matrixA[0][2], coef_matrixA[1][2], coef_matrixA[2][2]});
+    if (detA == 0.0)
+    {
         return intersectionPoint;
+    }
 
-    // calculations for gamma
-    float coef_matrixGamma[3][3] = {{a.x - b.x, a.x - ray.origin.x, ray.direction.x},
-                                    {a.y - b.y, a.y - ray.origin.y, ray.direction.y},
-                                    {a.z - b.z, a.z - ray.origin.z, ray.direction.z}};
-    gamma_val = determinant(coef_matrixGamma) / determinantA;
-    if (gamma_val < -EPSILON || (gamma_val > 1.f))
-        return intersectionPoint;
-
-    // calculations for beta
-    float coef_matrixBeta[3][3] = {{a.x - ray.origin.x, a.x - c.x, ray.direction.x},
-                                   {a.y - ray.origin.y, a.y - c.y, ray.direction.y},
-                                   {a.z - ray.origin.z, a.z - c.z, ray.direction.z}};
-    beta_val = determinant(coef_matrixBeta) / determinantA;
-    if ((beta_val < -EPSILON) || (beta_val + gamma_val > 1.f))
-        return intersectionPoint;
-
-    // calculations for t
+    // check t
     float coef_matrixT[3][3] = {{a.x - b.x, a.x - c.x, a.x - ray.origin.x},
                                 {a.y - b.y, a.y - c.y, a.y - ray.origin.y},
                                 {a.z - b.z, a.z - c.z, a.z - ray.origin.z}};
-    t_val = determinant(coef_matrixT) / determinantA;
-    if (t_val <= 0.0)
-        return intersectionPoint;
 
-    // at this point we are sure that ray intersects with the triangle
+    t_val = determinantA({coef_matrixT[0][0], coef_matrixT[1][0], coef_matrixT[2][0]},
+                         {coef_matrixT[0][1], coef_matrixT[1][1], coef_matrixT[2][1]},
+                         {coef_matrixT[0][2], coef_matrixT[1][2], coef_matrixT[2][2]}) /
+            detA;
+    if (t_val <= 0.0)
+    {
+        return intersectionPoint;
+    }
+
+    // check gamma
+    float coef_matrixGamma[3][3] = {{a.x - b.x, a.x - ray.origin.x, ray.direction.x},
+                                    {a.y - b.y, a.y - ray.origin.y, ray.direction.y},
+                                    {a.z - b.z, a.z - ray.origin.z, ray.direction.z}};
+
+    gamma_val = determinantA({coef_matrixGamma[0][0], coef_matrixGamma[1][0], coef_matrixGamma[2][0]},
+                             {coef_matrixGamma[0][1], coef_matrixGamma[1][1], coef_matrixGamma[2][1]},
+                             {coef_matrixGamma[0][2], coef_matrixGamma[1][2], coef_matrixGamma[2][2]}) /
+                detA;
+    if (gamma_val < 0 || gamma_val > 1)
+    {
+        return intersectionPoint;
+    }
+
+    // check beta
+    float coef_matrixBeta[3][3] = {{a.x - ray.origin.x, a.x - c.x, ray.direction.x},
+                                   {a.y - ray.origin.y, a.y - c.y, ray.direction.y},
+                                   {a.z - ray.origin.z, a.z - c.z, ray.direction.z}};
+    beta_val = determinantA({coef_matrixBeta[0][0], coef_matrixBeta[1][0], coef_matrixBeta[2][0]},
+                            {coef_matrixBeta[0][1], coef_matrixBeta[1][1], coef_matrixBeta[2][1]},
+                            {coef_matrixBeta[0][2], coef_matrixBeta[1][2], coef_matrixBeta[2][2]}) /
+               detA;
+    if (beta_val < 0 || beta_val > (1 - gamma_val))
+    {
+        return intersectionPoint;
+    }
+
     intersectionPoint.isIntersected = true;
     intersectionPoint.intersectionPoint = getIntersectionPoint(ray, t_val);
     intersectionPoint.t = t_val;
     intersectionPoint.normal = normalizeVector(crossProduct(subtract(b, a), subtract(c, a)));
-    intersectionPoint.objId = triangle.indices.v0_id;
+    intersectionPoint.objId = obj_id;
     intersectionPoint.objType = TRIANGLE;
-    intersectionPoint.material_id = triangle.material_id;
+    intersectionPoint.material_id = material_id;
 
     return intersectionPoint;
 }
@@ -258,7 +269,7 @@ Intersection raySphereIntersection(const Scene &scene, const Ray &ray, const Sph
  * @param mesh: the mesh object
  * @return: the intersection point
  */
-Intersection rayMeshIntersection(const Scene &scene, const Ray &ray, const Mesh &mesh)
+Intersection rayMeshIntersection(const Scene &scene, const Ray &ray, const Mesh &mesh, int material_id, int obj_id)
 {
     Intersection closestIntersection, triangleIntersection;
 
@@ -273,7 +284,7 @@ Intersection rayMeshIntersection(const Scene &scene, const Ray &ray, const Mesh 
 
         // Check for intersection with the current triangle
         // declare a new triangle with the material id and face
-        triangleIntersection = rayTriangleIntersection(scene, ray, {mesh.material_id, face}, true);
+        triangleIntersection = rayTriangleIntersection(ray, a, b, c, material_id, obj_id, true);
 
         if (triangleIntersection.isIntersected &&
             triangleIntersection.t >= 0 &&
@@ -282,11 +293,8 @@ Intersection rayMeshIntersection(const Scene &scene, const Ray &ray, const Mesh 
             closestIntersection = triangleIntersection;
         }
     }
-
-    // Return the closest intersection found within the mesh
     return closestIntersection;
 }
-
 /*
  * Calculate the optimal intersection point
  * @param scene: the scene object
@@ -300,7 +308,7 @@ Intersection rayObjectIntersection(const Scene &scene, const Ray &ray, bool back
     // we need to loop through all the objects and find the closest intersection point
     Intersection closestIntersection;
     closestIntersection.t = numeric_limits<float>::max();
-    int count = 0;
+    Mesh currentMesh;
     // sphere intersection
     for (const Sphere &sphere : scene.spheres)
     {
@@ -315,17 +323,26 @@ Intersection rayObjectIntersection(const Scene &scene, const Ray &ray, bool back
     // triangle intersection
     for (const Triangle &triangle : scene.triangles)
     {
-        Intersection triangleIntersection = rayTriangleIntersection(scene, ray, triangle, backFaceCulling);
-        if (triangleIntersection.isIntersected && triangleIntersection.t < closestIntersection.t)
+        Intersection triangleIntersection = rayTriangleIntersection(
+            ray,
+            scene.vertex_data[triangle.indices.v0_id - 1],
+            scene.vertex_data[triangle.indices.v1_id - 1],
+            scene.vertex_data[triangle.indices.v2_id - 1],
+            triangle.material_id,
+            triangle.indices.v0_id,
+            backFaceCulling);
+        if (triangleIntersection.isIntersected &&
+            triangleIntersection.t < closestIntersection.t)
         {
             closestIntersection = triangleIntersection;
         }
     }
-
+    int numberOfMeshes = scene.meshes.size();
     // mesh intersection
-    for (const Mesh &mesh : scene.meshes)
+    for (int meshNumber = 0; meshNumber < numberOfMeshes; meshNumber++)
     {
-        Intersection meshIntersection = rayMeshIntersection(scene, ray, mesh);
+        currentMesh = scene.meshes[meshNumber];
+        Intersection meshIntersection = rayMeshIntersection(scene, ray, currentMesh, currentMesh.material_id, meshNumber);
 
         if (meshIntersection.isIntersected && meshIntersection.t < closestIntersection.t)
         {
@@ -474,7 +491,9 @@ Vec3f coloring(const Scene &scene, const Intersection &intersection, int recDept
         reflection.x = 0;
         reflection.y = 0;
         reflection.z = 0;
-        bool isMirror = (scene.materials[materialId - 1].mirror.x > 0 || scene.materials[materialId - 1].mirror.y > 0 || scene.materials[materialId - 1].mirror.z > 0);
+        bool isMirror = (scene.materials[materialId - 1].mirror.x > 0 ||
+                         scene.materials[materialId - 1].mirror.y > 0 ||
+                         scene.materials[materialId - 1].mirror.z > 0);
 
         // at this point we processed the light yet there might be reflections so we need to check the recursion depth
         if (recDepth > 0 && isMirror)

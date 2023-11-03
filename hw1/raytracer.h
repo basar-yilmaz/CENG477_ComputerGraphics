@@ -123,6 +123,19 @@ float determinant(const float coef_matrix[3][3])
            coef_matrix[0][2] * (coef_matrix[1][0] * coef_matrix[2][1] - coef_matrix[1][1] * coef_matrix[2][0]);
 }
 
+// Calculates the determinant of a 3x3 matrix.
+// Arguments:
+//   v0, v1, v2: Vec3f objects representing the matrix rows.
+// Returns:
+//   A float representing the determinant of the matrix.
+float determinantA(const Vec3f &v0, const Vec3f &v1, const Vec3f &v2)
+{
+    float det = v0.x * (v1.y * v2.z - v2.y * v1.z) -
+                v0.y * (v2.x * v1.z - v1.x * v2.z) +
+                v0.z * (v1.x * v2.y - v1.y * v2.x);
+    return det;
+}
+
 Vec3f multiplyVectors(const Vec3f &a, const Vec3f &b)
 {
     return {a.x * b.x, a.y * b.y, a.z * b.z};
