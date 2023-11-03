@@ -406,7 +406,7 @@ Vec3f diffuseShading(const Scene &scene, const PointLight &light, const Intersec
  * as the specular shading depends on the view direction
  * @return: the specular shading radiance
  */
-Vec3f specularShading(const Scene &scene, const PointLight &light, const Intersection &inter, const Material &material, const Camera &camera)
+Vec3f specularShading(const Scene &scene, const PointLight &light, const Intersection &inter, const Material &material, const Camera &camera,const Ray &ray)
 {
     Vec3f specularCoef, lightDirection, cameraDirection, normal, halfVector, receivedRadiance, radiance;
 
@@ -422,7 +422,7 @@ Vec3f specularShading(const Scene &scene, const PointLight &light, const Interse
 
     lightDirection = normalizeVector(lightDirection);
 
-    halfVector = normalizeVector(add(lightDirection, cameraDirection));
+    halfVector = normalizeVector(subtract(lightDirection, ray.direction));
 
     radiance = scalarMulti(specularCoef, pow(max(dotProduct(normal, halfVector), 0.0f), material.phong_exponent));
 
@@ -438,7 +438,7 @@ Vec3f specularShading(const Scene &scene, const PointLight &light, const Interse
  * @param recDepth: the recursion depth
  * @return: the color of the pixel
  */
-Vec3f coloring(const Scene &scene, const Intersection &intersection, int recDepth, const Camera &camera)
+Vec3f coloring(const Scene &scene, const Intersection &intersection, int recDepth, const Camera &camera, const Ray &ray)
 {
     Vec3f color = {0, 0, 0};
 
@@ -455,9 +455,10 @@ Vec3f coloring(const Scene &scene, const Intersection &intersection, int recDept
 
             // calculate the shadowray and check if it intersects with any object
             Vec3f shadowRayDirection = normalizeVector(subtract(light.position, intersection.intersectionPoint));
-            Vec3f offset = scalarMulti(intersection.normal, scene.shadow_ray_epsilon);
+            Vec3f offset = scalarMulti(shadowRayDirection, scene.shadow_ray_epsilon);
             Ray shadowRay = {add(intersection.intersectionPoint, offset), shadowRayDirection};
             Intersection shadowRayIntersection = rayObjectIntersection(scene, shadowRay, false);
+            float tLight = subtract(light.position, shadowRay.origin).x / shadowRay.direction.x;
 
             // if the shadow ray intersects with an object, we need to check if the intersection point is behind the light source
             if (shadowRayIntersection.isIntersected)
@@ -482,7 +483,7 @@ Vec3f coloring(const Scene &scene, const Intersection &intersection, int recDept
                 color = add(color, diffuseColor);
 
                 // Compute and add specular shading
-                Vec3f specularColor = specularShading(scene, light, intersection, scene.materials[materialId - 1], camera);
+                Vec3f specularColor = specularShading(scene, light, intersection, scene.materials[materialId - 1], camera,ray);
                 color = add(color, specularColor);
             }
         }
@@ -500,11 +501,11 @@ Vec3f coloring(const Scene &scene, const Intersection &intersection, int recDept
         {
             // Compute the incoming direction from the intersection point back to the camera
             Vec3f incomingDirection = normalizeVector(subtract(intersection.intersectionPoint, camera.position));
-            float wi = -2 * dotProduct(incomingDirection, intersection.normal);
+            float wi = -2 * dotProduct(ray.direction, intersection.normal);
             Vec3f normal_ref;
-            normal_ref.x = intersection.normal.x * wi + incomingDirection.x;
-            normal_ref.y = intersection.normal.y * wi + incomingDirection.y;
-            normal_ref.z = intersection.normal.z * wi + incomingDirection.z;
+            normal_ref.x = intersection.normal.x * wi + ray.direction.x;
+            normal_ref.y = intersection.normal.y * wi + ray.direction.y;
+            normal_ref.z = intersection.normal.z * wi + ray.direction.z;
 
             normal_ref = normalizeVector(normal_ref);
 
@@ -518,7 +519,7 @@ Vec3f coloring(const Scene &scene, const Intersection &intersection, int recDept
 
             if (!(intRes.objId == intersection.objId && intRes.objType == intersection.objType))
             {
-                reflection = coloring(scene, intRes, (recDepth - 1), camera);
+                reflection = coloring(scene, intRes, (recDepth - 1), camera,reflectionRay);
             }
 
             color.x += reflection.x * scene.materials[materialId - 1].mirror.x;
@@ -553,7 +554,7 @@ void renderSection(unsigned char *image, int startRow, int endRow, int imageWidt
             Intersection intersection = rayObjectIntersection(scene, myRay, true);
 
             // Calculate color
-            Vec3f color = coloring(scene, intersection, scene.max_recursion_depth, camera);
+            Vec3f color = coloring(scene, intersection, scene.max_recursion_depth, camera,myRay);
 
             // Update the image buffer
             int pixelIndex = (i * imageWidth + j) * 3;
