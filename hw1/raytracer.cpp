@@ -458,10 +458,9 @@ Vec3f coloring(const Scene &scene, const Intersection &intersection, int recDept
             Vec3f offset = scalarMulti(shadowRayDirection, scene.shadow_ray_epsilon);
             Ray shadowRay = {add(intersection.intersectionPoint, offset), shadowRayDirection};
             Intersection shadowRayIntersection = rayObjectIntersection(scene, shadowRay, false);
-            float tLight = subtract(light.position, shadowRay.origin).x / shadowRay.direction.x;
 
             // if the shadow ray intersects with an object, we need to check if the intersection point is behind the light source
-            if (shadowRayIntersection.isIntersected)
+            if (!isShadow && shadowRayIntersection.isIntersected)
             {
                 Vec3f shadowRayIntersectionPoint = shadowRayIntersection.intersectionPoint;
                 Vec3f lightToIntersection = subtract(shadowRayIntersectionPoint, light.position);
