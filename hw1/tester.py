@@ -24,7 +24,7 @@ scores = {}
 
 # Compare the ppm files in the current directory with the corresponding files in ../outputs_nobfc/
 for ppm_file in ppm_files:
-    expected_file = "./outputs_nobfc/" + ppm_file
+    expected_file = "./outputs/" + ppm_file
     num_diff_pixels = 0
     total_pixels = 0
     with open(ppm_file, "r") as f1, open(expected_file, "r") as f2:

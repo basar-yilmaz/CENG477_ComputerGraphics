@@ -498,12 +498,12 @@ Vec3f coloring(const Scene &scene, const Intersection &intersection, int recDept
         if (recDepth > 0 && isMirror)
         {
             // Compute the incoming direction from the intersection point back to the camera
-            Vec3f incomingDirection = normalizeVector(subtract(intersection.intersectionPoint, camera.position));
-            float wi = -2 * dotProduct(incomingDirection, intersection.normal);
+            // Vec3f incomingDirection = normalizeVector(subtract(intersection.intersectionPoint, camera.position));
+            float wi = -2 * dotProduct(ray.direction, intersection.normal);
             Vec3f normal_ref;
-            normal_ref.x = intersection.normal.x * wi + incomingDirection.x;
-            normal_ref.y = intersection.normal.y * wi + incomingDirection.y;
-            normal_ref.z = intersection.normal.z * wi + incomingDirection.z;
+            normal_ref.x = intersection.normal.x * wi + ray.direction.x;
+            normal_ref.y = intersection.normal.y * wi + ray.direction.y;
+            normal_ref.z = intersection.normal.z * wi + ray.direction.z;
 
             normal_ref = normalizeVector(normal_ref);
 
