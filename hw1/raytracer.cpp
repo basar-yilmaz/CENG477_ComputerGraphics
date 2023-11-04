@@ -13,8 +13,6 @@ using namespace std;
 
 typedef unsigned char RGB[3];
 
-#define EPSILON 1e-6
-
 // created obj enum to make it easier to check the type of the object
 enum obj
 {
@@ -41,11 +39,12 @@ typedef struct
 
 } Ray;
 
-/*
+/**
  * Generate a ray from the camera
  * @param camera: the camera object (position(e), gaze(-w), up(u), near_plane(Vec4f), near_distance, image_width, image_height, image_name)
  * @param i: the i-th pixel
  * @param j: the j-th pixel
+ *
  * @return: a ray
  */
 Ray generateRay(const Camera &camera, int i, int j)
@@ -83,10 +82,11 @@ Ray generateRay(const Camera &camera, int i, int j)
     return ray;
 }
 
-/*
+/**
  * Calculate the intersection point of a ray and a plane
  * @param ray: the ray
  * @param t: the distance between the ray's origin and the intersection point
+ *
  * @return: the intersection point
  */
 Vec3f getIntersectionPoint(const Ray &ray, float t)
@@ -96,11 +96,12 @@ Vec3f getIntersectionPoint(const Ray &ray, float t)
     return intersectionPoint;
 }
 
-/*
+/**
  * Calculate the intersection point of a ray and a triangle
  * @param scene: the scene object
  * @param ray: the ray
  * @param triangle: the triangle object
+ * @param backFaceCulling: if the back face culling is enabled
  * @return: the intersection point
  */
 Intersection rayTriangleIntersection(const Scene &scene, const Ray &ray, const Triangle &triangle, bool backFaceCulling)
@@ -108,62 +109,82 @@ Intersection rayTriangleIntersection(const Scene &scene, const Ray &ray, const T
     // we will use barycentric coordinates to calculate the intersection point
     Intersection intersectionPoint;
 
+    // get the vertices of the triangle (a, b, c)
     Vec3f a = scene.vertex_data[triangle.indices.v0_id - 1];
     Vec3f b = scene.vertex_data[triangle.indices.v1_id - 1];
     Vec3f c = scene.vertex_data[triangle.indices.v2_id - 1];
 
-    // calculate triangles normal for back face culling
-    Vec3f edge1 = subtract(b, a);
-    Vec3f edge2 = subtract(c, a);
-    Vec3f triangleNormal = normalizeVector(crossProduct(edge1, edge2));
-
-    // check if the triangle is facing the camera
-    float dot_product = dotProduct(ray.direction, triangleNormal);
-
-    if (backFaceCulling && dot_product > 0.f)
+    // back face culling implementation
+    if (backFaceCulling)
     {
-        return intersectionPoint;
+        Vec3f normal = normalizeVector(crossProduct(subtract(a, b), subtract(a, c)));
+
+        // check if the triangle is facing the camera
+        if (dotProduct(normal, ray.direction) > 0.f)
+        {
+            return intersectionPoint;
+        }
     }
 
-    // we'll use cramer's rule to calculate the intersection point
-    // full formula is in the slides
-    float determinantA, t_val, gamma_val, beta_val;
+    float detA, t_val, gamma_val, beta_val;
 
     float coef_matrixA[3][3] = {{a.x - b.x, a.x - c.x, ray.direction.x},
                                 {a.y - b.y, a.y - c.y, ray.direction.y},
                                 {a.z - b.z, a.z - c.z, ray.direction.z}};
 
-    // we will move if by if inorder to avoid unnecessary calculations
-    determinantA = determinant(coef_matrixA);
+    // we will move step by step in order to avoid unnecessary calculations
 
-    if (std::abs(determinantA) < EPSILON)
+    // check detA
+    detA = determinantA({coef_matrixA[0][0], coef_matrixA[1][0], coef_matrixA[2][0]},
+                        {coef_matrixA[0][1], coef_matrixA[1][1], coef_matrixA[2][1]},
+                        {coef_matrixA[0][2], coef_matrixA[1][2], coef_matrixA[2][2]});
+    if (detA == 0.0)
+    {
         return intersectionPoint;
+    }
 
-    // calculations for gamma
-    float coef_matrixGamma[3][3] = {{a.x - b.x, a.x - ray.origin.x, ray.direction.x},
-                                    {a.y - b.y, a.y - ray.origin.y, ray.direction.y},
-                                    {a.z - b.z, a.z - ray.origin.z, ray.direction.z}};
-    gamma_val = determinant(coef_matrixGamma) / determinantA;
-    if (gamma_val < -EPSILON || (gamma_val > 1.f))
-        return intersectionPoint;
-
-    // calculations for beta
-    float coef_matrixBeta[3][3] = {{a.x - ray.origin.x, a.x - c.x, ray.direction.x},
-                                   {a.y - ray.origin.y, a.y - c.y, ray.direction.y},
-                                   {a.z - ray.origin.z, a.z - c.z, ray.direction.z}};
-    beta_val = determinant(coef_matrixBeta) / determinantA;
-    if ((beta_val < -EPSILON) || (beta_val + gamma_val > 1.f))
-        return intersectionPoint;
-
-    // calculations for t
+    // check t
     float coef_matrixT[3][3] = {{a.x - b.x, a.x - c.x, a.x - ray.origin.x},
                                 {a.y - b.y, a.y - c.y, a.y - ray.origin.y},
                                 {a.z - b.z, a.z - c.z, a.z - ray.origin.z}};
-    t_val = determinant(coef_matrixT) / determinantA;
-    if (t_val <= 0.0)
-        return intersectionPoint;
 
-    // at this point we are sure that ray intersects with the triangle
+    t_val = determinantA({coef_matrixT[0][0], coef_matrixT[1][0], coef_matrixT[2][0]},
+                         {coef_matrixT[0][1], coef_matrixT[1][1], coef_matrixT[2][1]},
+                         {coef_matrixT[0][2], coef_matrixT[1][2], coef_matrixT[2][2]}) /
+            detA;
+    if (t_val <= 0.0)
+    {
+        return intersectionPoint;
+    }
+
+    // check gamma
+    float coef_matrixGamma[3][3] = {{a.x - b.x, a.x - ray.origin.x, ray.direction.x},
+                                    {a.y - b.y, a.y - ray.origin.y, ray.direction.y},
+                                    {a.z - b.z, a.z - ray.origin.z, ray.direction.z}};
+
+    gamma_val = determinantA({coef_matrixGamma[0][0], coef_matrixGamma[1][0], coef_matrixGamma[2][0]},
+                             {coef_matrixGamma[0][1], coef_matrixGamma[1][1], coef_matrixGamma[2][1]},
+                             {coef_matrixGamma[0][2], coef_matrixGamma[1][2], coef_matrixGamma[2][2]}) /
+                detA;
+    if (gamma_val < 0 || gamma_val > 1)
+    {
+        return intersectionPoint;
+    }
+
+    // check beta
+    float coef_matrixBeta[3][3] = {{a.x - ray.origin.x, a.x - c.x, ray.direction.x},
+                                   {a.y - ray.origin.y, a.y - c.y, ray.direction.y},
+                                   {a.z - ray.origin.z, a.z - c.z, ray.direction.z}};
+
+    beta_val = determinantA({coef_matrixBeta[0][0], coef_matrixBeta[1][0], coef_matrixBeta[2][0]},
+                            {coef_matrixBeta[0][1], coef_matrixBeta[1][1], coef_matrixBeta[2][1]},
+                            {coef_matrixBeta[0][2], coef_matrixBeta[1][2], coef_matrixBeta[2][2]}) /
+               detA;
+    if (beta_val < 0 || beta_val > (1 - gamma_val))
+    {
+        return intersectionPoint;
+    }
+
     intersectionPoint.isIntersected = true;
     intersectionPoint.intersectionPoint = getIntersectionPoint(ray, t_val);
     intersectionPoint.t = t_val;
@@ -175,11 +196,12 @@ Intersection rayTriangleIntersection(const Scene &scene, const Ray &ray, const T
     return intersectionPoint;
 }
 
-/*
+/**
  * Calculate the intersection point of a ray and a sphere
  * @param scene: the scene object
  * @param ray: the ray
  * @param sphere: the sphere object
+ *
  * @return: the intersection point
  */
 Intersection raySphereIntersection(const Scene &scene, const Ray &ray, const Sphere &sphere)
@@ -251,11 +273,12 @@ Intersection raySphereIntersection(const Scene &scene, const Ray &ray, const Sph
     return point;
 }
 
-/*
+/**
  * Calculate the intersection point of a ray and a mesh
  * @param scene: the scene object
  * @param ray: the ray
  * @param mesh: the mesh object
+ *
  * @return: the intersection point
  */
 Intersection rayMeshIntersection(const Scene &scene, const Ray &ray, const Mesh &mesh)
@@ -287,20 +310,19 @@ Intersection rayMeshIntersection(const Scene &scene, const Ray &ray, const Mesh 
     return closestIntersection;
 }
 
-/*
+/**
  * Calculate the optimal intersection point
  * @param scene: the scene object
  * @param ray: the ray
+ * @param backFaceCulling: if the back face culling is enabled
  * @return: the optimal intersection point
  */
-
 Intersection rayObjectIntersection(const Scene &scene, const Ray &ray, bool backFaceCulling)
 {
 
     // we need to loop through all the objects and find the closest intersection point
     Intersection closestIntersection;
     closestIntersection.t = numeric_limits<float>::max();
-    int count = 0;
     // sphere intersection
     for (const Sphere &sphere : scene.spheres)
     {
@@ -336,11 +358,12 @@ Intersection rayObjectIntersection(const Scene &scene, const Ray &ray, bool back
     return closestIntersection;
 }
 
-/*
+/**
  * Calculate the ambient shading
  * @param scene: the scene object
  * @param inter: the intersection point
  * @param material: the material object
+ *
  * @return: the ambient shading radiance
  */
 Vec3f ambientShading(const Scene &scene, const Intersection &inter, const Material &material)
@@ -356,6 +379,16 @@ Vec3f ambientShading(const Scene &scene, const Intersection &inter, const Materi
     return radiance;
 }
 
+/**
+ * Calculates the diffuse shading for a given intersection point in a scene.
+ *
+ * @param scene The scene object containing the scene information.
+ * @param light The light object representing the light source.
+ * @param inter The intersection object representing the intersection point.
+ * @param material The material object representing the material properties.
+ *
+ * @return The diffuse shading color for the intersection point.
+ */
 Vec3f diffuseShading(const Scene &scene, const PointLight &light, const Intersection &inter, const Material &material)
 {
     // all the abrevation from slides
@@ -379,7 +412,7 @@ Vec3f diffuseShading(const Scene &scene, const PointLight &light, const Intersec
     return radiance;
 }
 
-/*
+/**
  * Calculate the specular shading
  * @param scene: the scene object
  * @param light: the light object
@@ -387,16 +420,16 @@ Vec3f diffuseShading(const Scene &scene, const PointLight &light, const Intersec
  * @param material: the material object
  * @param camera: the camera object (differs from ambient and diffuse shading)
  * as the specular shading depends on the view direction
+ * @param ray: the ray
+ *
  * @return: the specular shading radiance
  */
-Vec3f specularShading(const Scene &scene, const PointLight &light, const Intersection &inter, const Material &material, const Camera &camera)
+Vec3f specularShading(const Scene &scene, const PointLight &light, const Intersection &inter, const Material &material, const Camera &camera, const Ray &ray)
 {
-    Vec3f specularCoef, lightDirection, cameraDirection, normal, halfVector, receivedRadiance, radiance;
+    Vec3f lightDirection, halfVector, receivedRadiance, radiance;
 
-    specularCoef = material.specular;
     lightDirection = subtract(light.position, inter.intersectionPoint);
-    cameraDirection = normalizeVector(subtract(camera.position, inter.intersectionPoint)); // Fixed this
-    normal = inter.normal;
+    // cameraDirection = normalizeVector(subtract(camera.position, inter.intersectionPoint)); // Fixed this
 
     double r = length(lightDirection);
 
@@ -405,23 +438,26 @@ Vec3f specularShading(const Scene &scene, const PointLight &light, const Interse
 
     lightDirection = normalizeVector(lightDirection);
 
-    halfVector = normalizeVector(add(lightDirection, cameraDirection));
+    halfVector = normalizeVector(subtract(lightDirection, ray.direction));
 
-    radiance = scalarMulti(specularCoef, pow(max(dotProduct(normal, halfVector), 0.0f), material.phong_exponent));
+    radiance = scalarMulti(material.specular, pow(max(dotProduct(inter.normal, halfVector), 0.f), material.phong_exponent));
 
     radiance = multiplyVectors(radiance, receivedRadiance);
 
     return radiance;
 }
 
-/*
+/**
  * Calculate the color of the pixel
  * @param scene: the scene object
  * @param intersection: the intersection point
  * @param recDepth: the recursion depth
+ * @param camera: the camera object
+ * @param ray: the ray
+ *
  * @return: the color of the pixel
  */
-Vec3f coloring(const Scene &scene, const Intersection &intersection, int recDepth, const Camera &camera)
+Vec3f coloring(const Scene &scene, const Intersection &intersection, int recDepth, const Camera &camera, const Ray &ray)
 {
     Vec3f color = {0, 0, 0};
 
@@ -438,73 +474,73 @@ Vec3f coloring(const Scene &scene, const Intersection &intersection, int recDept
 
             // calculate the shadowray and check if it intersects with any object
             Vec3f shadowRayDirection = normalizeVector(subtract(light.position, intersection.intersectionPoint));
-            Vec3f offset = scalarMulti(intersection.normal, scene.shadow_ray_epsilon);
+
+            Vec3f offset = scalarMulti(shadowRayDirection, scene.shadow_ray_epsilon);
+
             Ray shadowRay = {add(intersection.intersectionPoint, offset), shadowRayDirection};
+            // we need to check if the shadow ray intersects with an object
             Intersection shadowRayIntersection = rayObjectIntersection(scene, shadowRay, false);
 
             // if the shadow ray intersects with an object, we need to check if the intersection point is behind the light source
-            if (shadowRayIntersection.isIntersected)
+            if (!isShadow && shadowRayIntersection.isIntersected)
             {
                 Vec3f shadowRayIntersectionPoint = shadowRayIntersection.intersectionPoint;
+
                 Vec3f lightToIntersection = subtract(shadowRayIntersectionPoint, light.position);
+
                 float distanceToLight = length(subtract(light.position, intersection.intersectionPoint));
-                // float distanceToIntersection = length(subtract(shadowRayIntersectionPoint, intersection.intersectionPoint));
+
                 if (shadowRayIntersection.t < distanceToLight)
                 {
                     isShadow = 1;
                 }
             }
 
+            // if the light is not in shadow we can add the diffuse and specular shading
             if (!isShadow)
             {
-                /*Vec3f lightDirection = normalizeVector(subtract(light.position, intersection.intersectionPoint));
-                Vec3f normal = intersection.normal;*/
-
                 // Compute and add diffuse shading
                 Vec3f diffuseColor = diffuseShading(scene, light, intersection, scene.materials[materialId - 1]);
                 color = add(color, diffuseColor);
 
                 // Compute and add specular shading
-                Vec3f specularColor = specularShading(scene, light, intersection, scene.materials[materialId - 1], camera);
+                Vec3f specularColor = specularShading(scene, light, intersection, scene.materials[materialId - 1], camera, ray);
                 color = add(color, specularColor);
             }
         }
 
-        Vec3f reflection;
-        reflection.x = 0;
-        reflection.y = 0;
-        reflection.z = 0;
-        bool isMirror = (scene.materials[materialId - 1].mirror.x > 0 || scene.materials[materialId - 1].mirror.y > 0 || scene.materials[materialId - 1].mirror.z > 0);
+        // initiliaze reflection ray
+        Vec3f reflection = {0, 0, 0};
+
+        // check if the material is reflective
+        bool isMirror = (scene.materials[materialId - 1].mirror.x > 0 ||
+                         scene.materials[materialId - 1].mirror.y > 0 ||
+                         scene.materials[materialId - 1].mirror.z > 0);
 
         // at this point we processed the light yet there might be reflections so we need to check the recursion depth
         if (recDepth > 0 && isMirror)
         {
             // Compute the incoming direction from the intersection point back to the camera
-            Vec3f incomingDirection = normalizeVector(subtract(intersection.intersectionPoint, camera.position));
-            float wi = -2 * dotProduct(incomingDirection, intersection.normal);
-            Vec3f normal_ref;
-            normal_ref.x = intersection.normal.x * wi + incomingDirection.x;
-            normal_ref.y = intersection.normal.y * wi + incomingDirection.y;
-            normal_ref.z = intersection.normal.z * wi + incomingDirection.z;
+            // Vec3f incomingDirection = normalizeVector(subtract(intersection.intersectionPoint, camera.position));
+            float wi = -2 * dotProduct(ray.direction, intersection.normal);
 
+            Vec3f normal_ref = scalarMulti(intersection.normal, wi);
+            normal_ref = add(normal_ref, ray.direction);
             normal_ref = normalizeVector(normal_ref);
 
-            Vec3f ref_epsilon;
-            ref_epsilon.x = normal_ref.x * scene.shadow_ray_epsilon;
-            ref_epsilon.y = normal_ref.y * scene.shadow_ray_epsilon;
-            ref_epsilon.z = normal_ref.z * scene.shadow_ray_epsilon;
+            Vec3f ref_epsilon = scalarMulti(normal_ref, scene.shadow_ray_epsilon);
 
             Ray reflectionRay = {add(intersection.intersectionPoint, ref_epsilon), normal_ref};
             Intersection intRes = rayObjectIntersection(scene, reflectionRay, false);
 
-            if (!(intRes.objId == intersection.objId && intRes.objType == intersection.objType))
+            if (intRes.objId != intersection.objId ||
+                intRes.objType != intersection.objType)
             {
-                reflection = coloring(scene, intRes, (recDepth - 1), camera);
+                reflection = coloring(scene, intRes, (recDepth - 1), camera, reflectionRay);
             }
 
-            color.x += reflection.x * scene.materials[materialId - 1].mirror.x;
-            color.y += reflection.y * scene.materials[materialId - 1].mirror.y;
-            color.z += reflection.z * scene.materials[materialId - 1].mirror.z;
+            color = add(color,
+                        multiplyVectors(reflection, scene.materials[materialId - 1].mirror));
         }
     }
 
@@ -517,10 +553,22 @@ Vec3f coloring(const Scene &scene, const Intersection &intersection, int recDept
     color.x = min(color.x, 255.0f);
     color.y = min(color.y, 255.0f);
     color.z = min(color.z, 255.0f);
+
     return color;
 }
 
-// Define a function to render a section of the image
+/**
+ * Renders a section of an image using ray tracing.
+ * This function is called by the main function to start multi-threaded rendering.
+ *
+ * @param image pointer to the image buffer
+ * @param startRow starting row index to render
+ * @param endRow ending row index to render
+ * @param imageWidth width of the image
+ * @param camera the camera object used for rendering
+ * @param scene the scene object containing objects to render
+ *
+ */
 void renderSection(unsigned char *image, int startRow, int endRow, int imageWidth, const Camera &camera, const Scene &scene)
 {
     for (int i = startRow; i < endRow; i++)
@@ -534,7 +582,7 @@ void renderSection(unsigned char *image, int startRow, int endRow, int imageWidt
             Intersection intersection = rayObjectIntersection(scene, myRay, true);
 
             // Calculate color
-            Vec3f color = coloring(scene, intersection, scene.max_recursion_depth, camera);
+            Vec3f color = coloring(scene, intersection, scene.max_recursion_depth, camera, myRay);
 
             // Update the image buffer
             int pixelIndex = (i * imageWidth + j) * 3;

@@ -1,6 +1,6 @@
 #pragma once
 
-/*
+/**
  * This file contains the functions for vector operations
  * such as dot product, cross product, etc.
  * There might be various ways to implement these functions more efficiently!
@@ -11,7 +11,6 @@
 #include "parser.h"
 
 using parser::Vec3f;
-// #define EPSILON 1e-6 // TODO find an optimal epsilon value
 
 /**
  * Calculates the dot product of two 3D vectors.
@@ -34,7 +33,6 @@ float dotProduct(const Vec3f &a, const Vec3f &b)
  *
  * @return a new Vec3f with each component divided by the scalar value
  *
- * @throws None
  */
 Vec3f scalarDivision(const Vec3f &a, const float k)
 {
@@ -49,7 +47,6 @@ Vec3f scalarDivision(const Vec3f &a, const float k)
  *
  * @return A new Vec3f with each component multiplied by the scalar value.
  *
- * @throws None.
  */
 Vec3f scalarMulti(const Vec3f &a, const float k)
 {
@@ -64,7 +61,6 @@ Vec3f scalarMulti(const Vec3f &a, const float k)
  *
  * @return The sum of the two Vec3f objects.
  *
- * @throws None.
  */
 Vec3f add(const Vec3f &a, const Vec3f &b)
 {
@@ -79,14 +75,21 @@ Vec3f add(const Vec3f &a, const Vec3f &b)
  *
  * @return a new Vec3f object that is the result of subtracting b from a
  *
- * @throws None
  */
 Vec3f subtract(const Vec3f &a, const Vec3f &b)
 {
     return {a.x - b.x, a.y - b.y, a.z - b.z};
 }
 
-// get cross product of two vectors s.t. A X B
+/**
+ * Calculates the cross product of two Vec3f vectors.
+ *
+ * @param a The first vector.
+ * @param b The second vector.
+ *
+ * @return The cross product of the two vectors.
+ *
+ */
 Vec3f crossProduct(const Vec3f &a, const Vec3f &b)
 {
     return {
@@ -95,13 +98,27 @@ Vec3f crossProduct(const Vec3f &a, const Vec3f &b)
         (a.x * b.y) - (a.y * b.x)};
 }
 
+/**
+ * Calculates the length of a Vec3f vector.
+ *
+ * @param a the vector to calculate the length of
+ *
+ * @return the length of the vector
+ *
+ */
 float length(const Vec3f &a)
 {
     return sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
 }
 
-// get the normalized vector with length = 1
-// return a new vector
+/**
+ * Normalizes a given Vec3f vector.
+ *
+ * @param a the vector to be normalized
+ *
+ * @return the normalized vector
+ *
+ */
 Vec3f normalizeVector(const Vec3f &a)
 {
     float len = length(a);
@@ -109,20 +126,46 @@ Vec3f normalizeVector(const Vec3f &a)
     return {a.x / len, a.y / len, a.z / len};
 }
 
-// Calculate the distance between two vectors using the Euclidean distance formula
+/**
+ * Calculates the distance between two Vec3f vectors.
+ *
+ * @param a The first vector.
+ * @param b The second vector.
+ *
+ * @return The distance between the two vectors.
+ *
+ */
 float distance(const Vec3f &a, const Vec3f &b)
 {
     return std::sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y) + (b.z - a.z) * (b.z - a.z));
 }
 
-// calculate the determinant of a 3x3 matrix
-float determinant(const float coef_matrix[3][3])
+/**
+ * Calculates the determinant of a 3x3 matrix formed by three Vec3f vectors.
+ *
+ * @param v0 the first vector of the matrix
+ * @param v1 the second vector of the matrix
+ * @param v2 the third vector of the matrix
+ *
+ * @return the determinant of the matrix
+ *
+ */
+float determinantA(const Vec3f &v0, const Vec3f &v1, const Vec3f &v2)
 {
-    return coef_matrix[0][0] * (coef_matrix[1][1] * coef_matrix[2][2] - coef_matrix[1][2] * coef_matrix[2][1]) -
-           coef_matrix[0][1] * (coef_matrix[1][0] * coef_matrix[2][2] - coef_matrix[1][2] * coef_matrix[2][0]) +
-           coef_matrix[0][2] * (coef_matrix[1][0] * coef_matrix[2][1] - coef_matrix[1][1] * coef_matrix[2][0]);
+    return v0.x * (v1.y * v2.z - v2.y * v1.z) +
+           v0.y * (v2.x * v1.z - v1.x * v2.z) +
+           v0.z * (v1.x * v2.y - v1.y * v2.x);
 }
 
+/**
+ * Multiplies two vectors element-wise.
+ *
+ * @param a the first vector
+ * @param b the second vector
+ *
+ * @return a new vector that is the element-wise product of a and b
+ *
+ */
 Vec3f multiplyVectors(const Vec3f &a, const Vec3f &b)
 {
     return {a.x * b.x, a.y * b.y, a.z * b.z};
