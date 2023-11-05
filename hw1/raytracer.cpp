@@ -6,12 +6,9 @@
 #include "parser.h"
 #include "ppm.h"
 #include "raytracer.h"
-#include <chrono>
 
 using namespace parser;
 using namespace std;
-
-typedef unsigned char RGB[3];
 
 // created obj enum to make it easier to check the type of the object
 enum obj
@@ -619,9 +616,6 @@ int main(int argc, char *argv[])
         int imageHeight = scene.cameras[cameraIndex].image_height;
         unsigned char *image = new unsigned char[imageWidth * imageHeight * 3];
 
-        // Start the timer
-        auto start_time = std::chrono::high_resolution_clock::now();
-
         // Define the number of threads you want to use
         int numThreads = std::thread::hardware_concurrency();
         std::vector<std::thread> threads;
@@ -640,14 +634,6 @@ int main(int argc, char *argv[])
         {
             thread.join();
         }
-
-        // Measure the end time
-        auto end_time = std::chrono::high_resolution_clock::now();
-
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-
-        std::cout << "Raytracing time for camera " << cameraIndex << ": " << duration.count() << " milliseconds" << std::endl;
-
         write_ppm(scene.cameras[cameraIndex].image_name.c_str(), image, imageWidth, imageHeight);
 
         delete[] image;
