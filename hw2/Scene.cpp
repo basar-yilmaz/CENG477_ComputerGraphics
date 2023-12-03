@@ -352,4 +352,150 @@ void Scene::convertPPMToPNG(string ppmFileName)
 void Scene::forwardRenderingPipeline(Camera *camera)
 {
 	// TODO: Implement this function
-}
+
+	// 1- calculate camera transformation matrix
+	Matrix4 camTransMatrix;
+	// formula from viewving transformation slides page 6
+	double tMatrix[4][4] = {{1, 0, 0, -camera->position.x},
+							{0, 1, 0, -camera->position.y},
+							{0, 0, 1, -camera->position.z},
+							{0, 0, 0, 1}};
+
+	// formula from viewving transformation slides page 7
+	double rMatrix[4][4] = {{camera->u.x, camera->u.y, camera->u.z, 0},
+							{camera->v.x, camera->v.y, camera->v.z, 0},
+							{camera->w.x, camera->w.y, camera->w.z, 0},
+							{0, 0, 0, 1}};
+
+	// formula from viewving transformation slides page 8
+	camTransMatrix = multiplyMatrixWithMatrix(rMatrix, tMatrix);
+
+	// 2- calculate orthographic or perspective projection transformation matrix
+	Matrix4 projTransMatrix;
+	if (camera->projectionType)
+	{
+		// calculate perspective projection transformation matrix
+		// formula from viewving transformation slides page 26
+		// TODO not sure about implementation of perspective divide check later didn't implemented here I believe .s
+		double temp[4][4] = {{2 * camera->near / (camera->right - camera->left), 0, (camera->right + camera->left) / (camera->right - camera->left), 0},
+							 {0, 2 * camera->near / (camera->top - camera->bottom), (camera->top + camera->bottom) / (camera->top - camera->bottom), 0},
+							 {0, 0, -(camera->far + camera->near) / (camera->far - camera->near), -2 * camera->far * camera->near / (camera->far - camera->near)},
+							 {0, 0, -1, 0}};
+		projTransMatrix = Matrix4(temp);
+	}
+	else
+	{
+		// calculate orthographic projection transformation matrix
+		// formula from viewving transformation slides page 14
+		double temp[4][4] = {{2 / (camera->right - camera->left), 0, 0, -(camera->right + camera->left) / (camera->right - camera->left)},
+							 {0, 2 / (camera->top - camera->bottom), 0, -(camera->top + camera->bottom) / (camera->top - camera->bottom)},
+							 {0, 0, -2 / (camera->far - camera->near), -(camera->far + camera->near) / (camera->far - camera->near)},
+							 {0, 0, 0, 1}};
+		projTransMatrix = Matrix4(temp);
+	}
+
+	// 3- calculate viewport transformation matrix
+	double tmpMvp[4][4] = {{camera->horRes / 2, 0, 0, (camera->horRes - 1) / 2},
+						   {0, camera->verRes / 2, 0, (camera->verRes - 1) / 2},
+						   {0, 0, 0.5, 0.5},
+						   {0, 0, 0, 1}};
+	Matrix4 viewportMatrix = Matrix4(tmpMvp);
+
+	// iterate through all meshes
+	for (auto &currentMesh : this->meshes)
+	{
+		// 4- implement modelling transformation
+		Matrix4 modellingMatrix = getIdentityMatrix();
+		// iterate through all modelling transformations of current mesh
+		for (int i = 0; i < currentMesh->numberOfTransformations; i++)
+		{
+			if (currentMesh->transformationTypes[i] == 'r')
+			{
+				// TODO implement rotation
+				Vec3 tmpVec = {this->rotations[currentMesh->transformationIds[i] - 1]->ux,
+							   this->rotations[currentMesh->transformationIds[i] - 1]->uy,
+							   this->rotations[currentMesh->transformationIds[i] - 1]->uz};
+				tmpVec = normalizeVec3(tmpVec);
+
+				// smallest component of v
+				double min = std::min(abs(tmpVec.y), abs(tmpVec.z));
+				if (abs(tmpVec.x) < min)
+				{
+					min = abs(tmpVec.x);
+				}
+
+				Vec3 v, w;
+
+				if (min == abs(tmpVec.x))
+				{
+					v.x = 0;
+					v.y = -tmpVec.z;
+					v.z = tmpVec.y;
+				}
+				else if (min == abs(tmpVec.y))
+				{
+					v.x = -tmpVec.z;
+					v.y = 0;
+					v.z = tmpVec.x;
+				}
+				else
+				{
+					v.x = -tmpVec.y;
+					v.y = tmpVec.x;
+					v.z = 0;
+				}
+
+				v = normalizeVec3(v);
+				w = crossProductVec3(tmpVec, v);
+
+				double rotationMatrix[4][4] = {{tmpVec.x, tmpVec.y, tmpVec.z, 0},
+											   {v.x, v.y, v.z, 0},
+											   {w.x, w.y, w.z, 0},
+											   {0, 0, 0, 1}};
+				double inverseRotationMatrix[4][4] = {{tmpVec.x, v.x, w.x, 0},
+													  {tmpVec.y, v.y, w.y, 0},
+													  {tmpVec.z, v.z, w.z, 0},
+													  {0, 0, 0, 1}};
+
+				// now we are on x-axis no problem if we rotate around x-axis
+				// TODO check correctness of this
+				double rotationAngleTheta = rotationAngleTheta * M_PI / 180;
+				double rotationMatrix2[4][4] = {{1, 0, 0, 0},
+												{0, cos(rotationAngleTheta), -sin(rotationAngleTheta), 0},
+												{0, sin(rotationAngleTheta), cos(rotationAngleTheta), 0},
+												{0, 0, 0, 1}};
+
+				Matrix4 firstRotationMatrix = multiplyMatrixWithMatrix(Matrix4(rotationMatrix2), Matrix4(rotationMatrix));
+				Matrix4 secondRotationMatrix = multiplyMatrixWithMatrix(Matrix4(inverseRotationMatrix), firstRotationMatrix);
+				modellingMatrix = multiplyMatrixWithMatrix(secondRotationMatrix, modellingMatrix);
+			}
+
+			if (currentMesh->transformationTypes[i] == 't')
+			{
+				double translationMatrix[4][4] = {{1, 0, 0, this->translations[currentMesh->transformationIds[i] - 1]->tx},
+												  {0, 1, 0, this->translations[currentMesh->transformationIds[i] - 1]->ty},
+												  {0, 0, 1, this->translations[currentMesh->transformationIds[i] - 1]->tz},
+												  {0, 0, 0, 1}};
+				modellingMatrix = multiplyMatrixWithMatrix(modellingMatrix, Matrix4(translationMatrix));
+			}
+
+			if (currentMesh->transformationTypes[i] == 's')
+			{
+				double scalingMatrix[4][4] = {{this->scalings[currentMesh->transformationIds[i] - 1]->sx, 0, 0, 0},
+											  {0, this->scalings[currentMesh->transformationIds[i] - 1]->sy, 0, 0},
+											  {0, 0, this->scalings[currentMesh->transformationIds[i] - 1]->sz, 0},
+											  {0, 0, 0, 1}};
+				modellingMatrix = multiplyMatrixWithMatrix(modellingMatrix, Matrix4(scalingMatrix));
+			}
+		}
+		Matrix4 allMatrices = multiplyMatrixWithMatrix(camTransMatrix, modellingMatrix);
+		allMatrices = multiplyMatrixWithMatrix(allMatrices, projTransMatrix); // projection matrix * camera matrix * modelling matrix
+		for (auto &currentTriangle : currentMesh->triangles)
+		{
+			// TODO implement clipping
+			// TODO implement culling
+			// TODO implement rasterization
+			// TODO implement z-buffering
+			// TODO implement backface culling
+		}
+	}
