@@ -353,6 +353,8 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 {
 	// TODO: Implement this function
 
+	bool cullingFlag = this->cullingEnabled;
+
 	// 1- calculate camera transformation matrix
 	Matrix4 camTransMatrix;
 	// formula from viewving transformation slides page 6
@@ -492,10 +494,57 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 		allMatrices = multiplyMatrixWithMatrix(allMatrices, projTransMatrix); // projection matrix * camera matrix * modelling matrix
 		for (auto &currentTriangle : currentMesh->triangles)
 		{
+			// create projected triangle
+			Vec3 *vector0 = this->vertices[currentTriangle.vertexIds[0] - 1];
+			Vec3 *vector1 = this->vertices[currentTriangle.vertexIds[1] - 1];
+			Vec3 *vector2 = this->vertices[currentTriangle.vertexIds[2] - 1];
+
+			// raw vectors before transformation
+			Vec4 unprocessedVector0 = Vec4(vector0->x, vector0->y, vector0->z, 1, vector0->colorId);
+			Vec4 unprocessedVector1 = Vec4(vector1->x, vector1->y, vector1->z, 1, vector1->colorId);
+			Vec4 unprocessedVector2 = Vec4(vector2->x, vector2->y, vector2->z, 1, vector2->colorId);
+
+			// transformed vectors after transformation we will use these vectors for clipping
+			Vec4 transformedVector0 = multiplyMatrixWithVec4(allMatrices, unprocessedVector0);
+			Vec4 transformedVector1 = multiplyMatrixWithVec4(allMatrices, unprocessedVector1);
+			Vec4 transformedVector2 = multiplyMatrixWithVec4(allMatrices, unprocessedVector2);
+
+			// check culling if culling is enabled
+			if (cullingFlag)
+			{
+				// check if mesh is backfacing the camera
+				// in this case just skip this mesh
+				// calculate normal vector of triangle
+				Vec3 normal = crossProductVec3(subtractVec3(*vector1, *vector0),
+											   subtractVec3(*vector2, *vector0));
+				normal = normalizeVec3(normal);
+				// TODO check this implementation
+				// double resultingDotProduct = dotProductVec3(camera->position, normal);
+				double resultingDotProduct = dotProductVec3(normal, *vector0);
+				if (resultingDotProduct > 0)
+				{
+					continue; // skip the mesh
+				}
+			}
+
 			// TODO implement clipping
-			// TODO implement culling
-			// TODO implement rasterization
+			// we need to use clipping only if we are using wireframe mode
+			// check wireframe => 0 for wireframe 1 for solid
+			if (currentMesh->type)
+			{
+				// TODO implement solid mode
+			}
+			else
+			{
+				// TODO implement wireframe mode
+				// Liang-Barsky algorithm (faster than Cohen-Sutherland)
+				// we got 3 lines for each triangle
+
+				Vec4 *line1 = new Vec4(transformedVector0);
+
+				// TODO implement rasterization
+			}
 			// TODO implement z-buffering
-			// TODO implement backface culling
 		}
 	}
+}
