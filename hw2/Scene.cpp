@@ -346,6 +346,127 @@ void Scene::convertPPMToPNG(string ppmFileName)
 	system(command.c_str());
 }
 
+// we will use this struct to store lines for Liang-Barsky algorithm
+struct LineVec4
+{
+	Vec4 vec;
+	Color color;
+
+	LineVec4(const Vec4 &v, const Color &c) : vec(v), color(c) {}
+};
+
+void perspectiveDivide(Vec4 &v)
+{
+	v.x = v.x / v.t;
+	v.y = v.y / v.t;
+	v.z = v.z / v.t;
+	v.t = 1;
+}
+
+/*
+	Checks if line is visible helper function for Liang-Barsky algorithm
+	Algorithm from slides page 46
+*/
+bool visible(double den, double num, double &enteringT, double &leavingT)
+{
+	if (den > 0) // potentially entering
+	{
+		double t = num / den;
+		if (t > leavingT)
+		{
+			return false;
+		}
+		if (t > enteringT)
+		{
+			enteringT = t;
+		}
+	}
+	else if (den < 0) // potentially leaving
+	{
+		double t = num / den;
+		if (t < enteringT)
+		{
+			return false;
+		}
+		if (t < leavingT)
+		{
+			leavingT = t;
+		}
+	}
+	else if (num > 0) // line parallel to edge
+	{
+		return false;
+	}
+
+	return true;
+}
+/*
+	Liang-Barsky algorithm
+	Algorithm from slides page 47
+*/
+bool lineClipping(LineVec4 &v1, LineVec4 &v2)
+{
+	// clipping slides page 46-47
+	double enteringT = 0;
+	double leavingT = 1;
+	bool visibility = 0;
+
+	// calculate dx dy dz
+	double dx = v2.vec.x - v1.vec.x;
+	double dy = v2.vec.y - v1.vec.y;
+	double dz = v2.vec.z - v1.vec.z;
+
+	// we will be around -1 to 1
+	int x_min = -1, x_max = 1;
+	int y_min = -1, y_max = 1;
+	int z_min = -1, z_max = 1;
+
+	// calculate color difference
+	Color colorDifference;
+	colorDifference.r = (v2.color.r - v1.color.r);
+	colorDifference.g = (v2.color.g - v1.color.g);
+	colorDifference.b = (v2.color.b - v1.color.b);
+
+	if (visible(dx, (x_min - v1.vec.x), enteringT, leavingT)) // left
+	{
+		if (visible(-dx, (v1.vec.x - x_max), enteringT, leavingT)) // right
+		{
+			if (visible(dy, (y_min - v1.vec.y), enteringT, leavingT)) // bottom
+			{
+				if (visible(-dy, (v1.vec.y - y_max), enteringT, leavingT)) // top
+				{
+					if (visible(dz, (z_min - v1.vec.z), enteringT, leavingT)) // front
+					{
+						if (visible(-dz, (v1.vec.z - z_max), enteringT, leavingT)) // back
+						{
+							if (leavingT < 1)
+							{
+								v2.vec.x = v1.vec.x + leavingT * dx;
+								v2.vec.y = v1.vec.y + leavingT * dy;
+								v2.vec.z = v1.vec.z + leavingT * dz;
+								v2.color.r = v1.color.r + leavingT * colorDifference.r;
+								v2.color.g = v1.color.g + leavingT * colorDifference.g;
+								v2.color.b = v1.color.b + leavingT * colorDifference.b;
+							}
+							if (enteringT > 0)
+							{
+								v1.vec.x = v1.vec.x + enteringT * dx;
+								v1.vec.y = v1.vec.y + enteringT * dy;
+								v1.vec.z = v1.vec.z + enteringT * dz;
+								v1.color.r = v1.color.r + enteringT * colorDifference.r;
+								v1.color.g = v1.color.g + enteringT * colorDifference.g;
+								v1.color.b = v1.color.b + enteringT * colorDifference.b;
+							}
+							visibility = 1;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return visibility;
+}
 /*
 	Transformations, clipping, culling, rasterization are done here.
 */
@@ -413,7 +534,6 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 		{
 			if (currentMesh->transformationTypes[i] == 'r')
 			{
-				// TODO implement rotation
 				Vec3 tmpVec = {this->rotations[currentMesh->transformationIds[i] - 1]->ux,
 							   this->rotations[currentMesh->transformationIds[i] - 1]->uy,
 							   this->rotations[currentMesh->transformationIds[i] - 1]->uz};
@@ -499,16 +619,6 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 			Vec3 *vector1 = this->vertices[currentTriangle.vertexIds[1] - 1];
 			Vec3 *vector2 = this->vertices[currentTriangle.vertexIds[2] - 1];
 
-			// raw vectors before transformation
-			Vec4 unprocessedVector0 = Vec4(vector0->x, vector0->y, vector0->z, 1, vector0->colorId);
-			Vec4 unprocessedVector1 = Vec4(vector1->x, vector1->y, vector1->z, 1, vector1->colorId);
-			Vec4 unprocessedVector2 = Vec4(vector2->x, vector2->y, vector2->z, 1, vector2->colorId);
-
-			// transformed vectors after transformation we will use these vectors for clipping
-			Vec4 transformedVector0 = multiplyMatrixWithVec4(allMatrices, unprocessedVector0);
-			Vec4 transformedVector1 = multiplyMatrixWithVec4(allMatrices, unprocessedVector1);
-			Vec4 transformedVector2 = multiplyMatrixWithVec4(allMatrices, unprocessedVector2);
-
 			// check culling if culling is enabled
 			if (cullingFlag)
 			{
@@ -527,12 +637,33 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 				}
 			}
 
-			// TODO implement clipping
+			// raw vectors before transformation
+			Vec4 unprocessedVector0 = Vec4(vector0->x, vector0->y, vector0->z, 1, vector0->colorId);
+			Vec4 unprocessedVector1 = Vec4(vector1->x, vector1->y, vector1->z, 1, vector1->colorId);
+			Vec4 unprocessedVector2 = Vec4(vector2->x, vector2->y, vector2->z, 1, vector2->colorId);
+
+			// transformed vectors after transformation we will use these vectors for clipping
+			Vec4 transformedVector0 = multiplyMatrixWithVec4(allMatrices, unprocessedVector0);
+			Vec4 transformedVector1 = multiplyMatrixWithVec4(allMatrices, unprocessedVector1);
+			Vec4 transformedVector2 = multiplyMatrixWithVec4(allMatrices, unprocessedVector2);
+
 			// we need to use clipping only if we are using wireframe mode
 			// check wireframe => 0 for wireframe 1 for solid
 			if (currentMesh->type)
 			{
 				// TODO implement solid mode
+
+				// perspective divison time
+				perspectiveDivide(transformedVector0);
+				perspectiveDivide(transformedVector1);
+				perspectiveDivide(transformedVector2);
+
+				// implement vp transformations now (perspective divide already done)
+				transformedVector0 = multiplyMatrixWithVec4(viewportMatrix, transformedVector0);
+				transformedVector1 = multiplyMatrixWithVec4(viewportMatrix, transformedVector1);
+				transformedVector2 = multiplyMatrixWithVec4(viewportMatrix, transformedVector2);
+
+				// TODO implement rasterization
 			}
 			else
 			{
@@ -540,11 +671,41 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 				// Liang-Barsky algorithm (faster than Cohen-Sutherland)
 				// we got 3 lines for each triangle
 
-				Vec4 *line1 = new Vec4(transformedVector0);
+				// perspective divison time
+				perspectiveDivide(transformedVector0);
+				perspectiveDivide(transformedVector1);
+				perspectiveDivide(transformedVector2);
+
+				// Create line 0-1 and 1-2 and 2-0 (logical triangle)
+				LineVec4 line01 = LineVec4(transformedVector0, *this->colorsOfVertices[vector0->colorId - 1]);
+				LineVec4 line10 = LineVec4(transformedVector1, *this->colorsOfVertices[vector1->colorId - 1]);
+				bool visibility01 = lineClipping(line01, line10);
+
+				LineVec4 line12 = LineVec4(transformedVector1, *this->colorsOfVertices[vector1->colorId - 1]);
+				LineVec4 line21 = LineVec4(transformedVector2, *this->colorsOfVertices[vector2->colorId - 1]);
+				bool visibility12 = lineClipping(line12, line21);
+
+				LineVec4 line20 = LineVec4(transformedVector2, *this->colorsOfVertices[vector2->colorId - 1]);
+				LineVec4 line02 = LineVec4(transformedVector0, *this->colorsOfVertices[vector0->colorId - 1]);
+				bool visibility20 = lineClipping(line20, line02);
+
+				// implement vp transformations now (perspective divide already done)
+				transformedVector0 = multiplyMatrixWithVec4(viewportMatrix, transformedVector0);
+				transformedVector1 = multiplyMatrixWithVec4(viewportMatrix, transformedVector1);
+				transformedVector2 = multiplyMatrixWithVec4(viewportMatrix, transformedVector2);
 
 				// TODO implement rasterization
+				if (visibility01)
+				{
+				}
+				if (visibility12)
+				{
+				}
+				if (visibility20)
+				{
+				}
 			}
-			// TODO implement z-buffering
+			// TODO implement z-buffering have no idea how to do this
 		}
 	}
 }
