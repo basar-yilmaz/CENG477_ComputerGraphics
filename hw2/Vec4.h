@@ -1,7 +1,8 @@
 #ifndef __VEC4_H__
 #define __VEC4_H__
 #define NO_COLOR -1
-
+#include <iostream>
+using namespace std;
 class Vec4
 {
 public:
@@ -15,7 +16,7 @@ public:
 
     double getNthComponent(int n);
 
-    friend std::ostream &operator<<(std::ostream &os, const Vec4 &v);
+    // friend std::ostream &operator<<(std::ostream &os, const Vec4 &v);
 };
 
 #endif

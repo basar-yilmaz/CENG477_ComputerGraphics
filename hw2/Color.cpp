@@ -21,8 +21,9 @@ Color::Color(const Color &other)
     this->b = other.b;
 }
 
-std::ostream &operator<<(std::ostream &os, const Color &c)
-{
-    os << std::fixed << std::setprecision(0) << "rgb(" << c.r << ", " << c.g << ", " << c.b << ")";
-    return os;
-}
+
+// std::ostream &operator<<(std::ostream &os, const Color &c)
+// {
+//     os << std::fixed << std::setprecision(0) << "rgb(" << c.r << ", " << c.g << ", " << c.b << ")";
+//     return os;
+// }

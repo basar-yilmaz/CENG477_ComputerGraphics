@@ -342,7 +342,7 @@ void Scene::convertPPMToPNG(string ppmFileName)
 	string command;
 
 	// TODO: Change implementation if necessary.
-	command = "./magick convert " + ppmFileName + " " + ppmFileName + ".png";
+	command = "convert " + ppmFileName + " " + ppmFileName + ".png";
 	system(command.c_str());
 }
 
@@ -352,8 +352,35 @@ struct LineVec4
 	Vec4 vec;
 	Color color;
 
-	LineVec4(const Vec4 &v, const Color &c) : vec(v), color(c) {}
+	LineVec4(Vec4 &v, Color &c) : vec(v), color(c) {}
 };
+
+Color colorDifference(Color &c1, Color &c2)
+{
+	Color result;
+	result.r = c1.r - c2.r;
+	result.g = c1.g - c2.g;
+	result.b = c1.b - c2.b;
+	return result;
+}
+
+Color colorDivision(Color &c1, int divisor)
+{
+	Color result;
+	result.r = c1.r / divisor;
+	result.g = c1.g / divisor;
+	result.b = c1.b / divisor;
+	return result;
+}
+
+Color colorAddition(Color &c1, Color &c2)
+{
+	Color result;
+	result.r = c1.r + c2.r;
+	result.g = c1.g + c2.g;
+	result.b = c1.b + c2.b;
+	return result;
+}
 
 void perspectiveDivide(Vec4 &v)
 {
@@ -471,36 +498,8 @@ bool lineClipping(LineVec4 &v1, LineVec4 &v2)
 	Transformations, clipping, culling, rasterization are done here.
 */
 
-Color colorDifference(Color &c1, Color &c2)
-{
-	Color result;
-	result.r = c1.r - c2.r;
-	result.g = c1.g - c2.g;
-	result.b = c1.b - c2.b;
-	return result;
-}
-
-Color colorDivision(Color &c1, int divisor)
-{
-	Color result;
-	result.r = c1.r / divisor;
-	result.g = c1.g / divisor;
-	result.b = c1.b / divisor;
-	return result;
-}
-
-Color colorAddition(Color &c1, Color &c2)
-{
-	Color result;
-	result.r = c1.r + c2.r;
-	result.g = c1.g + c2.g;
-	result.b = c1.b + c2.b;
-	return result;
-}
-
 void lineRasterization(vector<vector<Color>> &image, LineVec4 &v1, LineVec4 &v2)
 {
-	// TODO implement line rasterization
 	double dx = v2.vec.x - v1.vec.x;
 	double dy = v2.vec.y - v1.vec.y;
 	int movementInImage = 1; //
@@ -600,6 +599,90 @@ void lineRasterization(vector<vector<Color>> &image, LineVec4 &v1, LineVec4 &v2)
 		}
 	}
 }
+
+double f01(double x, double y, LineVec4 &v0, LineVec4 &v1)
+{
+	return (v0.vec.y - v1.vec.y) * x + (v1.vec.x - v0.vec.x) * y + v0.vec.x * v1.vec.y - v0.vec.y * v1.vec.x; // x(y0 - y1) + y(x1 - x0) + x0y1 - y0x1
+}
+
+double f12(double x, double y, LineVec4 &v1, LineVec4 &v2)
+{
+	return (v1.vec.y - v2.vec.y) * x + (v2.vec.x - v1.vec.x) * y + v1.vec.x * v2.vec.y - v1.vec.y * v2.vec.x; // x(y1 - y2) + y(x2 - x1) + x1y2 - y1x2
+}
+
+double f20(double x, double y, LineVec4 &v2, LineVec4 &v0)
+{
+	return (v2.vec.y - v0.vec.y) * x + (v0.vec.x - v2.vec.x) * y + v2.vec.x * v0.vec.y - v2.vec.y * v0.vec.x; // x(y2 - y0) + y(x0 - x2) + x2y0 - y2x0
+}
+
+void triangleRasterization(vector<vector<Color>> &image, LineVec4 &v0, LineVec4 &v1, LineVec4 &v2, int &maxFrameX, int &maxFrameY)
+{
+	// implementation from rasterization slides page 30
+
+	double x_min = std::min(v0.vec.x, std::min(v1.vec.x, v2.vec.x));
+	if (x_min < 0)
+	{
+		x_min = 0;
+	}
+	if (x_min > maxFrameX - 1)
+	{
+		x_min = maxFrameX - 1;
+	}
+	double x_max = std::max(v0.vec.x, std::max(v1.vec.x, v2.vec.x));
+	if (x_max < 0)
+	{
+		x_max = 0;
+	}
+	if (x_max > maxFrameX - 1)
+	{
+		x_max = maxFrameX - 1;
+	}
+	double y_min = std::min(v0.vec.y, std::min(v1.vec.y, v2.vec.y));
+	if (y_min < 0)
+	{
+		y_min = 0;
+	}
+	if (y_min > maxFrameY - 1)
+	{
+		y_min = maxFrameY - 1;
+	}
+	double y_max = std::max(v0.vec.y, std::max(v1.vec.y, v2.vec.y));
+	if (y_max < 0)
+	{
+		y_max = 0;
+	}
+	if (y_max > maxFrameY - 1)
+	{
+		y_max = maxFrameY - 1;
+	}
+
+	for (int y = y_min; y <= y_max; y++)
+	{
+		for (int x = x_min; x <= x_max; x++)
+		{
+			// TODO check this
+			double alpha = f12(x, y, v1, v2) / f12(v0.vec.x, v0.vec.y, v1, v2);
+			double beta = f20(x, y, v2, v0) / f20(v1.vec.x, v1.vec.y, v2, v0);
+			double gamma = f01(x, y, v0, v1) / f01(v2.vec.x, v2.vec.y, v0, v1);
+
+			if (alpha >= 0 && beta >= 0 && gamma >= 0)
+			{
+				Color color;
+				color.r = alpha * v0.color.r + beta * v1.color.r + gamma * v2.color.r;
+				color.g = alpha * v0.color.g + beta * v1.color.g + gamma * v2.color.g;
+				color.b = alpha * v0.color.b + beta * v1.color.b + gamma * v2.color.b;
+
+				Color rounded_color;
+				rounded_color.r = (int)(color.r + 0.5);
+				rounded_color.g = (int)(color.g + 0.5);
+				rounded_color.b = (int)(color.b + 0.5);
+
+				image[x][y] = rounded_color;
+			}
+		}
+	}
+}
+
 void Scene::forwardRenderingPipeline(Camera *camera)
 {
 	// TODO: Implement this function
@@ -609,9 +692,9 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 	// 1- calculate camera transformation matrix
 	Matrix4 camTransMatrix;
 	// formula from viewving transformation slides page 6
-	double tMatrix[4][4] = {{1, 0, 0, -camera->position.x},
-							{0, 1, 0, -camera->position.y},
-							{0, 0, 1, -camera->position.z},
+	double tMatrix[4][4] = {{1, 0, 0, -(camera->position.x)},
+							{0, 1, 0, -(camera->position.y)},
+							{0, 0, 1, -(camera->position.z)},
 							{0, 0, 0, 1}};
 
 	// formula from viewving transformation slides page 7
@@ -634,12 +717,13 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 							 {0, 2 * camera->near / (camera->top - camera->bottom), (camera->top + camera->bottom) / (camera->top - camera->bottom), 0},
 							 {0, 0, -(camera->far + camera->near) / (camera->far - camera->near), -2 * camera->far * camera->near / (camera->far - camera->near)},
 							 {0, 0, -1, 0}};
+
 		projTransMatrix = Matrix4(temp);
 	}
 	else
 	{
 		// calculate orthographic projection transformation matrix
-		// formula from viewving transformation slides page 14
+		// formula from viewing transformation slides page 14
 		double temp[4][4] = {{2 / (camera->right - camera->left), 0, 0, -(camera->right + camera->left) / (camera->right - camera->left)},
 							 {0, 2 / (camera->top - camera->bottom), 0, -(camera->top + camera->bottom) / (camera->top - camera->bottom)},
 							 {0, 0, -2 / (camera->far - camera->near), -(camera->far + camera->near) / (camera->far - camera->near)},
@@ -648,8 +732,8 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 	}
 
 	// 3- calculate viewport transformation matrix
-	double tmpMvp[4][4] = {{camera->horRes / 2, 0, 0, (camera->horRes - 1) / 2},
-						   {0, camera->verRes / 2, 0, (camera->verRes - 1) / 2},
+	double tmpMvp[4][4] = {{camera->horRes / (double)2, 0, 0, (camera->horRes - 1) / (double)2},
+						   {0, camera->verRes / (double)2, 0, (camera->verRes - 1) / (double)2},
 						   {0, 0, 0.5, 0.5},
 						   {0, 0, 0, 1}};
 	Matrix4 viewportMatrix = Matrix4(tmpMvp);
@@ -794,6 +878,10 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 				transformedVector2 = multiplyMatrixWithVec4(viewportMatrix, transformedVector2);
 
 				// TODO implement rasterization
+				LineVec4 line01 = LineVec4(transformedVector0, *this->colorsOfVertices[vector0->colorId - 1]);
+				LineVec4 line12 = LineVec4(transformedVector1, *this->colorsOfVertices[vector1->colorId - 1]);
+				LineVec4 line20 = LineVec4(transformedVector2, *this->colorsOfVertices[vector2->colorId - 1]);
+				triangleRasterization(this->image, line01, line12, line20, camera->horRes, camera->verRes);
 			}
 			else
 			{

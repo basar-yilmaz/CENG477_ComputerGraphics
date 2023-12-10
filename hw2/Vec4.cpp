@@ -56,8 +56,9 @@ double Vec4::getNthComponent(int n)
     }
 }
 
-std::ostream &operator<<(std::ostream &os, const Vec4 &v)
-{
-    os << std::fixed << std::setprecision(6) << "[" << v.x << ", " << v.y << ", " << v.z << ", " << v.t << "]";
-    return os;
-}
+
+// std::ostream &operator<<(std::ostream &os, const Vec4 &v)
+// {
+//     os << std::fixed << std::setprecision(6) << "[" << v.x << ", " << v.y << ", " << v.z << ", " << v.t << "]";
+//     return os;
+// }

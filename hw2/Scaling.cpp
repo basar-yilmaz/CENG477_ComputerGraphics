@@ -16,9 +16,9 @@ Scaling::Scaling(int scalingId, double sx, double sy, double sz)
     this->sz = sz;
 }
 
-std::ostream &operator<<(std::ostream &os, const Scaling &s)
-{
-    os << std::fixed << std::setprecision(3) << "Scaling " << s.scalingId << " => [" << s.sx << ", " << s.sy << ", " << s.sz << "]";
+// std::ostream &operator<<(std::ostream &os, const Scaling &s)
+// {
+//     os << std::fixed << std::setprecision(3) << "Scaling " << s.scalingId << " => [" << s.sx << ", " << s.sy << ", " << s.sz << "]";
 
-    return os;
-}
+//     return os;
+// }
