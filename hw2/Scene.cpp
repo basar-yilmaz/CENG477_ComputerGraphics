@@ -470,6 +470,136 @@ bool lineClipping(LineVec4 &v1, LineVec4 &v2)
 /*
 	Transformations, clipping, culling, rasterization are done here.
 */
+
+Color colorDifference(Color &c1, Color &c2)
+{
+	Color result;
+	result.r = c1.r - c2.r;
+	result.g = c1.g - c2.g;
+	result.b = c1.b - c2.b;
+	return result;
+}
+
+Color colorDivision(Color &c1, int divisor)
+{
+	Color result;
+	result.r = c1.r / divisor;
+	result.g = c1.g / divisor;
+	result.b = c1.b / divisor;
+	return result;
+}
+
+Color colorAddition(Color &c1, Color &c2)
+{
+	Color result;
+	result.r = c1.r + c2.r;
+	result.g = c1.g + c2.g;
+	result.b = c1.b + c2.b;
+	return result;
+}
+
+void lineRasterization(vector<vector<Color>> &image, LineVec4 &v1, LineVec4 &v2)
+{
+	// TODO implement line rasterization
+	double dx = v2.vec.x - v1.vec.x;
+	double dy = v2.vec.y - v1.vec.y;
+	int movementInImage = 1; //
+	Color colorChange;
+
+	// we need to implement modified rasterization algorithm
+	// since the slope of the line may be greater than 1
+	// implementation similar to rasterization slides page 22
+
+	if (std::abs(dy) > std::abs(dx))
+	{
+		// the case where slope is greater than 1
+		// difference is that x and y values should be swapped
+
+		// if x2 < x1 swap them
+		if (v2.vec.y < v1.vec.y)
+		{
+			LineVec4 tmp = v1;
+			v1 = v2;
+			v2 = tmp;
+		}
+
+		movementInImage = -1 ? v2.vec.x < v1.vec.x : 1;
+
+		int x0 = v1.vec.x;
+		Color c0 = v1.color;
+		int d = (v1.vec.x - v2.vec.x) + (movementInImage * 0.5 * (v2.vec.y - v1.vec.y));
+		Color tempDiff = colorDifference(v2.color, v1.color);
+		colorChange = colorDivision(tempDiff, v2.vec.y - v1.vec.y); // skip alpha value by directly computing color increment
+
+		// we got our constants now iterate through whole y values
+		for (int i = v1.vec.y; i <= v2.vec.y; i++)
+		{
+			Color rounded_c0;
+			rounded_c0.r = (int)(c0.r + 0.5);
+			rounded_c0.g = (int)(c0.g + 0.5);
+			rounded_c0.b = (int)(c0.b + 0.5);
+
+			image[x0][i] = rounded_c0;
+
+			// choose between x0 and x0+1 (NE or E)
+
+			if (d * movementInImage <= 0)
+			{
+				d += (v1.vec.y - v2.vec.y); // move horizontally only
+			}
+			else
+			{ // move diagonally (NE)
+				d += (v1.vec.y - v2.vec.y) + (movementInImage * (v2.vec.x - v1.vec.x));
+				x0 += movementInImage;
+			}
+			c0 = colorAddition(c0, colorChange); // interpolate color
+		}
+	}
+	else
+	{
+		// the case where slope is in between 0 and <=1
+
+		// if x2 < x1 swap them
+		if (v2.vec.x < v1.vec.x)
+		{
+			LineVec4 tmp = v1;
+			v1 = v2;
+			v2 = tmp;
+		}
+
+		movementInImage = -1 ? v2.vec.y < v1.vec.y : 1;
+
+		int y0 = v1.vec.y;
+		Color c0 = v1.color;
+		int d = (v1.vec.y - v2.vec.y) + (movementInImage * 0.5 * (v2.vec.x - v1.vec.x));
+		Color tempDiff = colorDifference(v2.color, v1.color);
+		colorChange = colorDivision(tempDiff, v2.vec.x - v1.vec.x);
+
+		// we got our constants now iterate through whole x values
+		for (int i = v1.vec.x; i <= v2.vec.x; i++)
+		{
+			Color rounded_c0;
+			rounded_c0.r = (int)(c0.r + 0.5);
+			rounded_c0.g = (int)(c0.g + 0.5);
+			rounded_c0.b = (int)(c0.b + 0.5);
+
+			image[i][y0] = rounded_c0;
+
+			// choose between y0 and y0+1 (NE or E)
+
+			if (d * movementInImage <= 0)
+			{
+				d += (v1.vec.y - v2.vec.y); // move horizontally only
+			}
+			else
+			{ // move diagonally (NE)
+				d += (v1.vec.y - v2.vec.y) + (movementInImage * (v2.vec.x - v1.vec.x));
+				y0 += movementInImage;
+			}
+			c0 = colorAddition(c0, colorChange); // interpolate color
+		}
+	}
+}
 void Scene::forwardRenderingPipeline(Camera *camera)
 {
 	// TODO: Implement this function
@@ -697,12 +827,15 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 				// TODO implement rasterization
 				if (visibility01)
 				{
+					lineRasterization(this->image, line01, line10);
 				}
 				if (visibility12)
 				{
+					lineRasterization(this->image, line12, line21);
 				}
 				if (visibility20)
 				{
+					lineRasterization(this->image, line20, line02);
 				}
 			}
 			// TODO implement z-buffering have no idea how to do this
