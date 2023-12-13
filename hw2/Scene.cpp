@@ -14,10 +14,614 @@
 
 using namespace tinyxml2;
 using namespace std;
+/*
+	Get modelling transformations
+*/
+Matrix4 Scene::modellingTransformations(Mesh *mesh)
+{
+	Matrix4 modellingMatrix = getIdentityMatrix();
+	for (int i = 0; i < (mesh->numberOfTransformations); i++)
+	{
+		// rotation check this one again
+		if (mesh->transformationTypes[i] == 'r')
+		{
+			Rotation *rotate1 = rotations[mesh->transformationIds[i] - 1];
 
+			double angle = (rotate1->angle * M_PI) / 180;
+
+			// final rotation matrix
+			double rotationMatrix[4][4] =
+				{
+					{cos(angle) + (rotate1->ux * rotate1->ux) * (1. - cos(angle)), rotate1->ux * rotate1->uy * (1. - cos(angle)) - rotate1->uz * sin(angle), rotate1->ux * rotate1->uz * (1. - cos(angle)) + rotate1->uy * sin(angle), 0},
+					{rotate1->uy * rotate1->ux * (1. - cos(angle)) + rotate1->uz * sin(angle), cos(angle) + (rotate1->uy * rotate1->uy) * (1. - cos(angle)), rotate1->uy * rotate1->uz * (1. - cos(angle)) - rotate1->ux * sin(angle), 0},
+					{rotate1->uz * rotate1->ux * (1. - cos(angle)) - rotate1->uy * sin(angle), rotate1->uz * rotate1->uy * (1. - cos(angle)) + rotate1->ux * sin(angle), cos(angle) + (rotate1->uz * rotate1->uz) * (1. - cos(angle)), 0},
+					{0, 0, 0, 1}};
+			modellingMatrix = multiplyMatrixWithMatrix(modellingMatrix, Matrix4(rotationMatrix));
+		}
+
+		// translation
+		else if (mesh->transformationTypes[i] == 't')
+		{
+			Translation *translation1 = translations[mesh->transformationIds[i] - 1];
+			double translationMatrix[4][4] = {{1, 0, 0, translation1->tx},
+											  {0, 1, 0, translation1->ty},
+											  {0, 0, 1, translation1->tz},
+											  {0, 0, 0, 1}};
+			modellingMatrix = multiplyMatrixWithMatrix(modellingMatrix, Matrix4(translationMatrix));
+		}
+
+		// scaling
+		else if (mesh->transformationTypes[i] == 's')
+		{
+			Scaling *scale1 = scalings[mesh->transformationIds[i] - 1];
+			double scalingMatrix[4][4] = {{scale1->sx, 0, 0, 0},
+										  {0, scale1->sy, 0, 0},
+										  {0, 0, scale1->sz, 0},
+										  {0, 0, 0, 1}};
+			modellingMatrix = multiplyMatrixWithMatrix(modellingMatrix, Matrix4(scalingMatrix));
+		}
+	}
+	return modellingMatrix;
+}
+
+/*
+	Get orthographic projection transformation
+*/
+Matrix4 Scene::orthTransformation(Camera *camera)
+{
+	double temp[4][4] = {{2 / (camera->right - camera->left), 0, 0, -(camera->right + camera->left) / (camera->right - camera->left)},
+						 {0, 2 / (camera->top - camera->bottom), 0, -(camera->top + camera->bottom) / (camera->top - camera->bottom)},
+						 {0, 0, -2 / (camera->far - camera->near), -(camera->far + camera->near) / (camera->far - camera->near)},
+						 {0, 0, 0, 1}};
+	return Matrix4(temp);
+}
+
+/*
+	Get perspective projection transformation
+*/
+Matrix4 Scene::perspectiveTransformation(Camera *camera)
+{
+	double temp[4][4] = {{2 * camera->near / (camera->right - camera->left), 0, (camera->right + camera->left) / (camera->right - camera->left), 0},
+						 {0, 2 * camera->near / (camera->top - camera->bottom), (camera->top + camera->bottom) / (camera->top - camera->bottom), 0},
+						 {0, 0, -(camera->far + camera->near) / (camera->far - camera->near), -2 * camera->far * camera->near / (camera->far - camera->near)},
+						 {0, 0, -1, 0}};
+	return Matrix4(temp);
+}
+
+/*
+	perspective division
+*/
+Vec4 Scene::perspectiveDivide(Vec4 &v)
+{
+	Vec4 res;
+	res.x = v.x / v.t;
+	res.y = v.y / v.t;
+	res.z = v.z / v.t;
+	res.t = 1;
+	res.colorId = v.colorId;
+	res.color = v.color;
+	return res;
+}
+
+/*
+	Get camera transformation
+*/
+Matrix4 Scene::camTransformation(Camera *camera)
+{
+	// formula from viewving transformation slides page 6
+	double tMatrix[4][4] = {{1, 0, 0, -(camera->position.x)},
+							{0, 1, 0, -(camera->position.y)},
+							{0, 0, 1, -(camera->position.z)},
+							{0, 0, 0, 1}};
+
+	// formula from viewving transformation slides page 7
+	double rMatrix[4][4] = {{camera->u.x, camera->u.y, camera->u.z, 0},
+							{camera->v.x, camera->v.y, camera->v.z, 0},
+							{camera->w.x, camera->w.y, camera->w.z, 0},
+							{0, 0, 0, 1}};
+
+	// formula from viewing transformation slides page 8
+	return multiplyMatrixWithMatrix(Matrix4(rMatrix), Matrix4(tMatrix));
+}
+
+/*
+	Get viewport transformation
+*/
+Matrix4 Scene::viewTransformation(Camera *camera)
+{
+	double temp[4][4] = {{camera->horRes / (double)2, 0, 0, (camera->horRes - 1) / (double)2},
+						 {0, camera->verRes / (double)2, 0, (camera->verRes - 1) / (double)2},
+						 {0, 0, (double)0.5, (double)0.5},
+						 {0, 0, 0, 0}}; // not sure maybe {0, 0, 0, 1}
+	return Matrix4(temp);
+}
 /*
 	Parses XML file
 */
+
+Color colorDifference(Color &c1, Color &c2)
+{
+	Color result;
+	result.r = c1.r - c2.r;
+	result.g = c1.g - c2.g;
+	result.b = c1.b - c2.b;
+	return result;
+}
+
+Color colorDivision(Color &c1, int divisor)
+{
+	Color result;
+	result.r = c1.r / divisor;
+	result.g = c1.g / divisor;
+	result.b = c1.b / divisor;
+	return result;
+}
+
+Color colorAddition(Color &c1, Color &c2)
+{
+	Color result;
+	result.r = c1.r + c2.r;
+	result.g = c1.g + c2.g;
+	result.b = c1.b + c2.b;
+	return result;
+}
+
+/*
+	Checks if line is visible helper function for Liang-Barsky algorithm
+	Algorithm from slides page 46
+*/
+bool visible(double den, double num, double &enteringT, double &leavingT)
+{
+	if (den > 0) // potentially entering
+	{
+		double t = num / den;
+		if (t > leavingT)
+		{
+			return false;
+		}
+		if (t > enteringT)
+		{
+			enteringT = t;
+		}
+	}
+	else if (den < 0) // potentially leaving
+	{
+		double t = num / den;
+		if (t < enteringT)
+		{
+			return false;
+		}
+		if (t < leavingT)
+		{
+			leavingT = t;
+		}
+	}
+	else if (num > 0) // line parallel to edge
+	{
+		return false;
+	}
+
+	return true;
+}
+/*
+	Liang-Barsky algorithm
+	Algorithm from slides page 47
+*/
+bool Scene::lineClipping(LineVec4 &vertices)
+{
+	// clipping slides page 46-47
+	double enteringT = 0;
+	double leavingT = 1;
+	bool visibility = 0;
+
+	// calculate dx dy dz
+	double dx = vertices.vertex2.x - vertices.vertex1.x;
+	double dy = vertices.vertex2.y - vertices.vertex1.y;
+	double dz = vertices.vertex2.z - vertices.vertex1.z;
+
+	// we will be around -1 to 1
+	int x_min = -1, x_max = 1;
+	int y_min = -1, y_max = 1;
+	int z_min = -1, z_max = 1;
+
+	// calculate color difference
+	Color colorDifference;
+	colorDifference.r = (vertices.vertex2.color.r - vertices.vertex1.color.r);
+	colorDifference.g = (vertices.vertex2.color.g - vertices.vertex1.color.g);
+	colorDifference.b = (vertices.vertex2.color.b - vertices.vertex1.color.b);
+
+	if (visible(dx, (x_min - vertices.vertex1.x), enteringT, leavingT)) // left
+	{
+		if (visible(-dx, (vertices.vertex1.x - x_max), enteringT, leavingT)) // right
+		{
+			if (visible(dy, (y_min - vertices.vertex1.y), enteringT, leavingT)) // bottom
+			{
+				if (visible(-dy, (vertices.vertex1.y - y_max), enteringT, leavingT)) // top
+				{
+					if (visible(dz, (z_min - vertices.vertex1.z), enteringT, leavingT)) // front
+					{
+						if (visible(-dz, (vertices.vertex1.z - z_max), enteringT, leavingT)) // back
+						{
+							if (leavingT < 1)
+							{
+								vertices.vertex2.x = vertices.vertex1.x + leavingT * dx;
+								vertices.vertex2.y = vertices.vertex1.y + leavingT * dy;
+								vertices.vertex2.z = vertices.vertex1.z + leavingT * dz;
+								vertices.vertex2.color.r = vertices.vertex1.color.r + leavingT * colorDifference.r;
+								vertices.vertex2.color.g = vertices.vertex1.color.g + leavingT * colorDifference.g;
+								vertices.vertex2.color.b = vertices.vertex1.color.b + leavingT * colorDifference.b;
+							}
+							if (enteringT > 0)
+							{
+								vertices.vertex1.x = vertices.vertex1.x + enteringT * dx;
+								vertices.vertex1.y = vertices.vertex1.y + enteringT * dy;
+								vertices.vertex1.z = vertices.vertex1.z + enteringT * dz;
+								vertices.vertex1.color.r = vertices.vertex1.color.r + enteringT * colorDifference.r;
+								vertices.vertex1.color.g = vertices.vertex1.color.g + enteringT * colorDifference.g;
+								vertices.vertex1.color.b = vertices.vertex1.color.b + enteringT * colorDifference.b;
+							}
+							visibility = 1;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return visibility;
+}
+/*
+	Transformations, clipping, culling, rasterization are done here.
+*/
+
+bool Scene::isCulled(Vec4 vertices[3])
+{
+	Vec3 vector1 = subtractVec3(Vec3(vertices[1].x, vertices[1].y, vertices[1].z, vertices[1].colorId), Vec3(vertices[0].x, vertices[0].y, vertices[0].z, vertices[0].colorId));
+	Vec3 vector2 = subtractVec3(Vec3(vertices[2].x, vertices[2].y, vertices[2].z, vertices[2].colorId), Vec3(vertices[0].x, vertices[0].y, vertices[0].z, vertices[0].colorId));
+
+	Vec3 normal = crossProductVec3(vector1, vector2);
+	normal = normalizeVec3(normal);
+	double dotProductOfViewVsOrigin = dotProductVec3(normal, Vec3(vertices[1].x, vertices[1].y, vertices[1].z, vertices[1].colorId));
+	if (dotProductOfViewVsOrigin < 0)
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+void Scene::lineRasterization(std::pair<Vec3, Vec3> &vertices)
+{
+	double dx = vertices.second.x - vertices.first.x;
+	double dy = vertices.second.y - vertices.first.y;
+	int movementInImage = 1; //
+	Color colorChange;
+
+	// we need to implement modified rasterization algorithm
+	// since the slope of the line may be greater than 1
+	// implementation similar to rasterization slides page 22
+
+	if (std::abs(dy) > std::abs(dx))
+	{
+		// the case where slope is greater than 1
+		// difference is that x and y values should be swapped
+
+		// if x2 < x1 swap them
+		if (vertices.second.y < vertices.first.y)
+		{
+			Vec3 tmp = vertices.first;
+			vertices.first = vertices.second;
+			vertices.second = tmp;
+		}
+
+		movementInImage = -1 ? vertices.second.x < vertices.first.x : 1;
+
+		int x0 = vertices.first.x;
+		Color c0 = vertices.first.color;
+		int d = (vertices.first.x - vertices.second.x) + (movementInImage * 0.5 * (vertices.second.y - vertices.first.y));
+		Color tempDiff = colorDifference(vertices.second.color, vertices.first.color);
+		colorChange = colorDivision(tempDiff, vertices.second.y - vertices.first.y); // skip alpha value by directly computing color increment
+
+		// we got our constants now iterate through whole y values
+		for (int i = vertices.first.y; i <= vertices.second.y; i++)
+		{
+			Color rounded_c0;
+			rounded_c0.r = (int)(c0.r + 0.5);
+			rounded_c0.g = (int)(c0.g + 0.5);
+			rounded_c0.b = (int)(c0.b + 0.5);
+
+			image[x0][i] = rounded_c0;
+
+			// choose between x0 and x0+1 (NE or E)
+
+			if (d * movementInImage <= 0)
+			{
+				d += (vertices.first.y - vertices.second.y); // move horizontally only
+			}
+			else
+			{ // move diagonally (NE)
+				d += (vertices.first.y - vertices.second.y) + (movementInImage * (vertices.second.x - vertices.first.x));
+				x0 += movementInImage;
+			}
+			c0 = colorAddition(c0, colorChange); // interpolate color
+		}
+	}
+	else
+	{
+		// the case where slope is in between 0 and <=1
+
+		// if x2 < x1 swap them
+		if (vertices.second.x < vertices.first.x)
+		{
+			Vec3 tmp = vertices.first;
+			vertices.first = vertices.second;
+			vertices.second = tmp;
+		}
+
+		movementInImage = -1 ? vertices.second.y < vertices.first.y : 1;
+
+		int y0 = vertices.first.y;
+		Color c0 = vertices.first.color;
+		int d = (vertices.first.y - vertices.second.y) + (movementInImage * 0.5 * (vertices.second.x - vertices.first.x));
+		Color tempDiff = colorDifference(vertices.second.color, vertices.first.color);
+		colorChange = colorDivision(tempDiff, vertices.second.x - vertices.first.x);
+
+		// we got our constants now iterate through whole x values
+		for (int i = vertices.first.x; i <= vertices.second.x; i++)
+		{
+			Color rounded_c0;
+			rounded_c0.r = (int)(c0.r + 0.5);
+			rounded_c0.g = (int)(c0.g + 0.5);
+			rounded_c0.b = (int)(c0.b + 0.5);
+
+			image[i][y0] = rounded_c0;
+
+			// choose between y0 and y0+1 (NE or E)
+
+			if (d * movementInImage <= 0)
+			{
+				d += (vertices.first.y - vertices.second.y); // move horizontally only
+			}
+			else
+			{ // move diagonally (NE)
+				d += (vertices.first.y - vertices.second.y) + (movementInImage * (vertices.second.x - vertices.first.x));
+				y0 += movementInImage;
+			}
+			c0 = colorAddition(c0, colorChange); // interpolate color
+		}
+	}
+}
+
+double Scene::f_alpha(vector<Vec3> &vertices, double currentX, double currentY)
+{
+	double temp1 = currentX * (vertices[1].y - vertices[2].y) + currentY * (vertices[2].x - vertices[1].x) + (vertices[1].x * vertices[2].y) - (vertices[1].y * vertices[2].x);
+	double temp2 = vertices[0].x * (vertices[1].y - vertices[2].y) + vertices[0].y * (vertices[2].x - vertices[1].x) + (vertices[1].x * vertices[2].y) - (vertices[1].y * vertices[2].x);
+	return temp1 / temp2;
+}
+
+double Scene::f_beta(vector<Vec3> &vertices, double currentX, double currentY)
+{
+	double temp1 = currentX * (vertices[2].y - vertices[0].y) + currentY * (vertices[0].x - vertices[2].x) + (vertices[2].x * vertices[0].y) - (vertices[2].y * vertices[0].x);
+	double temp2 = vertices[1].x * (vertices[2].y - vertices[0].y) + vertices[1].y * (vertices[0].x - vertices[2].x) + (vertices[2].x * vertices[0].y) - (vertices[2].y * vertices[0].x);
+	return temp1 / temp2;
+}
+
+double Scene::f_gamma(vector<Vec3> &vertices, double currentX, double currentY)
+{
+	double temp1 = currentX * (vertices[0].y - vertices[1].y) + currentY * (vertices[1].x - vertices[0].x) + (vertices[0].x * vertices[1].y) - (vertices[0].y * vertices[1].x);
+	double temp2 = vertices[2].x * (vertices[0].y - vertices[1].y) + vertices[2].y * (vertices[1].x - vertices[0].x) + (vertices[0].x * vertices[1].y) - (vertices[0].y * vertices[1].x);
+	return temp1 / temp2;
+}
+
+void Scene::triangleRasterization(vector<Vec3> &vertices, int maxFrameX, int maxFrameY)
+{
+	// implementation from rasterization slides page 30
+
+	double x_min = std::min(vertices[0].x, std::min(vertices[1].x, vertices[2].x));
+	if (x_min < 0)
+	{
+		x_min = 0;
+	}
+	// if (x_min > maxFrameX - 1)
+	// {
+	// 	x_min = maxFrameX - 1;
+	// }
+	double x_max = std::max(vertices[0].x, std::max(vertices[1].x, vertices[2].x));
+	if (x_max < 0)
+	{
+		x_max = 0;
+	}
+	if (x_max > maxFrameX - 1)
+	{
+		x_max = maxFrameX - 1;
+	}
+	double y_min = std::min(vertices[0].y, std::min(vertices[1].y, vertices[2].y));
+	if (y_min < 0)
+	{
+		y_min = 0;
+	}
+	// if (y_min > maxFrameY - 1)
+	// {
+	// 	y_min = maxFrameY - 1;
+	// }
+	double y_max = std::max(vertices[0].y, std::max(vertices[1].y, vertices[2].y));
+	if (y_max < 0)
+	{
+		y_max = 0;
+	}
+	if (y_max > maxFrameY - 1)
+	{
+		y_max = maxFrameY - 1;
+	}
+
+	for (int y = y_min; y <= y_max; y++)
+	{
+		for (int x = x_min; x <= x_max; x++)
+		{
+			// TODO check this
+			double alpha, beta, gamma;
+			alpha = f_alpha(vertices, x, y);
+			beta = f_beta(vertices, x, y);
+			gamma = f_gamma(vertices, x, y);
+
+			if (alpha >= 0 && beta >= 0 && gamma >= 0)
+			{
+				Color color;
+				color.r = alpha * vertices[0].color.r + beta * vertices[1].color.r + gamma * vertices[2].color.r;
+				color.g = alpha * vertices[0].color.g + beta * vertices[1].color.g + gamma * vertices[2].color.g;
+				color.b = alpha * vertices[0].color.b + beta * vertices[1].color.b + gamma * vertices[2].color.b;
+
+				Color rounded_color;
+				rounded_color.r = (int)(color.r + 0.5);
+				rounded_color.g = (int)(color.g + 0.5);
+				rounded_color.b = (int)(color.b + 0.5);
+
+				image[x][y] = rounded_color;
+			}
+		}
+	}
+}
+
+void Scene::forwardRenderingPipeline(Camera *camera)
+{
+	// TODO: Implement z-depth buffering
+	// TODO: some pictures does not show up correctly
+
+	bool cullingFlag = this->cullingEnabled;
+
+	Matrix4 viewingTransformationMatrix = viewTransformation(camera);
+
+	for (const auto &currentMesh : meshes)
+	{
+		for (const auto &currentTriangle : currentMesh->triangles)
+		{
+			// Vertex 0
+			Vec4 vertex0 = Vec4(vertices[currentTriangle.vertexIds[0] - 1]->x,
+								vertices[currentTriangle.vertexIds[0] - 1]->y,
+								vertices[currentTriangle.vertexIds[0] - 1]->z,
+								1,
+								*(colorsOfVertices[vertices[currentTriangle.vertexIds[0] - 1]->colorId - 1]));
+
+			// Vertex 1
+			Vec4 vertex1 = Vec4(vertices[currentTriangle.vertexIds[1] - 1]->x,
+								vertices[currentTriangle.vertexIds[1] - 1]->y,
+								vertices[currentTriangle.vertexIds[1] - 1]->z,
+								1,
+								*(colorsOfVertices[vertices[currentTriangle.vertexIds[1] - 1]->colorId - 1]));
+
+			// Vertex 2
+			Vec4 vertex2 = Vec4(vertices[currentTriangle.vertexIds[2] - 1]->x,
+								vertices[currentTriangle.vertexIds[2] - 1]->y,
+								vertices[currentTriangle.vertexIds[2] - 1]->z,
+								1,
+								*(colorsOfVertices[vertices[currentTriangle.vertexIds[2] - 1]->colorId - 1]));
+
+			// apply modelling transformations
+			Matrix4 modelMatrix = modellingTransformations(currentMesh);
+
+			// apply camera transformations
+			Matrix4 cameraMatrix = camTransformation(camera);
+
+			// apply projection transformations depends on type
+			Matrix4 projectionMatrix = (camera->projectionType == 0) ? orthTransformation(camera) : perspectiveTransformation(camera);
+
+			Matrix4 wholeTransformationsMatrix = multiplyMatrixWithMatrix(projectionMatrix, multiplyMatrixWithMatrix(cameraMatrix, modelMatrix));
+
+			Vec4 transformedVertex0 = multiplyMatrixWithVec4(wholeTransformationsMatrix, vertex0);
+			Vec4 transformedVertex1 = multiplyMatrixWithVec4(wholeTransformationsMatrix, vertex1);
+			Vec4 transformedVertex2 = multiplyMatrixWithVec4(wholeTransformationsMatrix, vertex2);
+
+			transformedVertex0.color = vertex0.color;
+			transformedVertex1.color = vertex1.color;
+			transformedVertex2.color = vertex2.color;
+
+			transformedVertex0 = camera->projectionType ? perspectiveDivide(transformedVertex0) : transformedVertex0;
+			transformedVertex1 = camera->projectionType ? perspectiveDivide(transformedVertex1) : transformedVertex1;
+			transformedVertex2 = camera->projectionType ? perspectiveDivide(transformedVertex2) : transformedVertex2;
+
+			Vec4 verticesArray[3];
+			verticesArray[0] = transformedVertex0;
+			verticesArray[1] = transformedVertex1;
+			verticesArray[2] = transformedVertex2;
+
+			if (cullingFlag && isCulled(verticesArray))
+				continue;
+
+			if (currentMesh->type)
+			{
+				// solid mode
+
+				vector<Vec3> viewPortedVertices;
+
+				for (int i = 0; i < 3; i++)
+				{
+					Vec4 temporaryTransferMatrix = multiplyMatrixWithVec4(viewingTransformationMatrix, verticesArray[i]);
+					Vec3 currentTransformedVertex = Vec3(temporaryTransferMatrix.x, temporaryTransferMatrix.y, temporaryTransferMatrix.z, verticesArray[i].color);
+					viewPortedVertices.push_back(currentTransformedVertex);
+				}
+
+				triangleRasterization(viewPortedVertices, camera->horRes, camera->verRes);
+			}
+			else
+			{
+				// wireframe mode
+				LineVec4 v0 = LineVec4(verticesArray[0], verticesArray[1]);
+				LineVec4 v1 = LineVec4(verticesArray[1], verticesArray[2]);
+				LineVec4 v2 = LineVec4(verticesArray[2], verticesArray[0]);
+
+				// check clipping here
+				bool firstLineVisible = lineClipping(v0);
+				bool secondLineVisible = lineClipping(v1);
+				bool thirdLineVisible = lineClipping(v2);
+
+				// check if it is totally clipped out or not draw it
+				if (firstLineVisible)
+				{
+					Vec4 tempMatrix1 = multiplyMatrixWithVec4(viewingTransformationMatrix, v0.vertex1);
+					Vec3 viewportedVertex0 = Vec3(tempMatrix1.x, tempMatrix1.y, tempMatrix1.z, v0.vertex1.color);
+
+					Vec4 tempMatrix2 = multiplyMatrixWithVec4(viewingTransformationMatrix, v0.vertex1);
+					Vec3 viewportedVertex1 = Vec3(tempMatrix2.x, tempMatrix2.y, tempMatrix2.z, v1.vertex2.color);
+
+					std::pair<Vec3, Vec3> viewportedVertices = std::make_pair(viewportedVertex0, viewportedVertex1);
+
+					lineRasterization(viewportedVertices);
+				}
+
+				if (secondLineVisible)
+				{
+
+					Vec4 tempMatrix1 = multiplyMatrixWithVec4(viewingTransformationMatrix, v1.vertex1);
+					Vec3 viewportedVertex0 = Vec3(tempMatrix1.x, tempMatrix1.y, tempMatrix1.z, v1.vertex1.color);
+
+					Vec4 tempMatrix2 = multiplyMatrixWithVec4(viewingTransformationMatrix, v1.vertex1);
+					Vec3 viewportedVertex1 = Vec3(tempMatrix2.x, tempMatrix2.y, tempMatrix2.z, v1.vertex2.color);
+
+					std::pair<Vec3, Vec3> viewportedVertices = std::make_pair(viewportedVertex0, viewportedVertex1);
+
+					lineRasterization(viewportedVertices);
+				}
+
+				if (thirdLineVisible)
+				{
+
+					Vec4 tempMatrix1 = multiplyMatrixWithVec4(viewingTransformationMatrix, v2.vertex1);
+					Vec3 viewportedVertex0 = Vec3(tempMatrix1.x, tempMatrix1.y, tempMatrix1.z, v2.vertex1.color);
+
+					Vec4 tempMatrix2 = multiplyMatrixWithVec4(viewingTransformationMatrix, v2.vertex1);
+					Vec3 viewportedVertex1 = Vec3(tempMatrix2.x, tempMatrix2.y, tempMatrix2.z, v2.vertex2.color);
+
+					std::pair<Vec3, Vec3> viewportedVertices = std::make_pair(viewportedVertex0, viewportedVertex1);
+
+					lineRasterization(viewportedVertices);
+				}
+			}
+		}
+	}
+}
+
 Scene::Scene(const char *xmlPath)
 {
 	const char *str;
@@ -344,589 +948,4 @@ void Scene::convertPPMToPNG(string ppmFileName)
 	// TODO: Change implementation if necessary.
 	command = "convert " + ppmFileName + " " + ppmFileName + ".png";
 	system(command.c_str());
-}
-
-// we will use this struct to store lines for Liang-Barsky algorithm
-struct LineVec4
-{
-	Vec4 vec;
-	Color color;
-
-	LineVec4(Vec4 &v, Color &c) : vec(v), color(c) {}
-};
-
-Color colorDifference(Color &c1, Color &c2)
-{
-	Color result;
-	result.r = c1.r - c2.r;
-	result.g = c1.g - c2.g;
-	result.b = c1.b - c2.b;
-	return result;
-}
-
-Color colorDivision(Color &c1, int divisor)
-{
-	Color result;
-	result.r = c1.r / divisor;
-	result.g = c1.g / divisor;
-	result.b = c1.b / divisor;
-	return result;
-}
-
-Color colorAddition(Color &c1, Color &c2)
-{
-	Color result;
-	result.r = c1.r + c2.r;
-	result.g = c1.g + c2.g;
-	result.b = c1.b + c2.b;
-	return result;
-}
-
-void perspectiveDivide(Vec4 &v)
-{
-	v.x = v.x / v.t;
-	v.y = v.y / v.t;
-	v.z = v.z / v.t;
-	v.t = 1;
-}
-
-/*
-	Checks if line is visible helper function for Liang-Barsky algorithm
-	Algorithm from slides page 46
-*/
-bool visible(double den, double num, double &enteringT, double &leavingT)
-{
-	if (den > 0) // potentially entering
-	{
-		double t = num / den;
-		if (t > leavingT)
-		{
-			return false;
-		}
-		if (t > enteringT)
-		{
-			enteringT = t;
-		}
-	}
-	else if (den < 0) // potentially leaving
-	{
-		double t = num / den;
-		if (t < enteringT)
-		{
-			return false;
-		}
-		if (t < leavingT)
-		{
-			leavingT = t;
-		}
-	}
-	else if (num > 0) // line parallel to edge
-	{
-		return false;
-	}
-
-	return true;
-}
-/*
-	Liang-Barsky algorithm
-	Algorithm from slides page 47
-*/
-bool lineClipping(LineVec4 &v1, LineVec4 &v2)
-{
-	// clipping slides page 46-47
-	double enteringT = 0;
-	double leavingT = 1;
-	bool visibility = 0;
-
-	// calculate dx dy dz
-	double dx = v2.vec.x - v1.vec.x;
-	double dy = v2.vec.y - v1.vec.y;
-	double dz = v2.vec.z - v1.vec.z;
-
-	// we will be around -1 to 1
-	int x_min = -1, x_max = 1;
-	int y_min = -1, y_max = 1;
-	int z_min = -1, z_max = 1;
-
-	// calculate color difference
-	Color colorDifference;
-	colorDifference.r = (v2.color.r - v1.color.r);
-	colorDifference.g = (v2.color.g - v1.color.g);
-	colorDifference.b = (v2.color.b - v1.color.b);
-
-	if (visible(dx, (x_min - v1.vec.x), enteringT, leavingT)) // left
-	{
-		if (visible(-dx, (v1.vec.x - x_max), enteringT, leavingT)) // right
-		{
-			if (visible(dy, (y_min - v1.vec.y), enteringT, leavingT)) // bottom
-			{
-				if (visible(-dy, (v1.vec.y - y_max), enteringT, leavingT)) // top
-				{
-					if (visible(dz, (z_min - v1.vec.z), enteringT, leavingT)) // front
-					{
-						if (visible(-dz, (v1.vec.z - z_max), enteringT, leavingT)) // back
-						{
-							if (leavingT < 1)
-							{
-								v2.vec.x = v1.vec.x + leavingT * dx;
-								v2.vec.y = v1.vec.y + leavingT * dy;
-								v2.vec.z = v1.vec.z + leavingT * dz;
-								v2.color.r = v1.color.r + leavingT * colorDifference.r;
-								v2.color.g = v1.color.g + leavingT * colorDifference.g;
-								v2.color.b = v1.color.b + leavingT * colorDifference.b;
-							}
-							if (enteringT > 0)
-							{
-								v1.vec.x = v1.vec.x + enteringT * dx;
-								v1.vec.y = v1.vec.y + enteringT * dy;
-								v1.vec.z = v1.vec.z + enteringT * dz;
-								v1.color.r = v1.color.r + enteringT * colorDifference.r;
-								v1.color.g = v1.color.g + enteringT * colorDifference.g;
-								v1.color.b = v1.color.b + enteringT * colorDifference.b;
-							}
-							visibility = 1;
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return visibility;
-}
-/*
-	Transformations, clipping, culling, rasterization are done here.
-*/
-
-void lineRasterization(vector<vector<Color>> &image, LineVec4 &v1, LineVec4 &v2)
-{
-	double dx = v2.vec.x - v1.vec.x;
-	double dy = v2.vec.y - v1.vec.y;
-	int movementInImage = 1; //
-	Color colorChange;
-
-	// we need to implement modified rasterization algorithm
-	// since the slope of the line may be greater than 1
-	// implementation similar to rasterization slides page 22
-
-	if (std::abs(dy) > std::abs(dx))
-	{
-		// the case where slope is greater than 1
-		// difference is that x and y values should be swapped
-
-		// if x2 < x1 swap them
-		if (v2.vec.y < v1.vec.y)
-		{
-			LineVec4 tmp = v1;
-			v1 = v2;
-			v2 = tmp;
-		}
-
-		movementInImage = -1 ? v2.vec.x < v1.vec.x : 1;
-
-		int x0 = v1.vec.x;
-		Color c0 = v1.color;
-		int d = (v1.vec.x - v2.vec.x) + (movementInImage * 0.5 * (v2.vec.y - v1.vec.y));
-		Color tempDiff = colorDifference(v2.color, v1.color);
-		colorChange = colorDivision(tempDiff, v2.vec.y - v1.vec.y); // skip alpha value by directly computing color increment
-
-		// we got our constants now iterate through whole y values
-		for (int i = v1.vec.y; i <= v2.vec.y; i++)
-		{
-			Color rounded_c0;
-			rounded_c0.r = (int)(c0.r + 0.5);
-			rounded_c0.g = (int)(c0.g + 0.5);
-			rounded_c0.b = (int)(c0.b + 0.5);
-
-			image[x0][i] = rounded_c0;
-
-			// choose between x0 and x0+1 (NE or E)
-
-			if (d * movementInImage <= 0)
-			{
-				d += (v1.vec.y - v2.vec.y); // move horizontally only
-			}
-			else
-			{ // move diagonally (NE)
-				d += (v1.vec.y - v2.vec.y) + (movementInImage * (v2.vec.x - v1.vec.x));
-				x0 += movementInImage;
-			}
-			c0 = colorAddition(c0, colorChange); // interpolate color
-		}
-	}
-	else
-	{
-		// the case where slope is in between 0 and <=1
-
-		// if x2 < x1 swap them
-		if (v2.vec.x < v1.vec.x)
-		{
-			LineVec4 tmp = v1;
-			v1 = v2;
-			v2 = tmp;
-		}
-
-		movementInImage = -1 ? v2.vec.y < v1.vec.y : 1;
-
-		int y0 = v1.vec.y;
-		Color c0 = v1.color;
-		int d = (v1.vec.y - v2.vec.y) + (movementInImage * 0.5 * (v2.vec.x - v1.vec.x));
-		Color tempDiff = colorDifference(v2.color, v1.color);
-		colorChange = colorDivision(tempDiff, v2.vec.x - v1.vec.x);
-
-		// we got our constants now iterate through whole x values
-		for (int i = v1.vec.x; i <= v2.vec.x; i++)
-		{
-			Color rounded_c0;
-			rounded_c0.r = (int)(c0.r + 0.5);
-			rounded_c0.g = (int)(c0.g + 0.5);
-			rounded_c0.b = (int)(c0.b + 0.5);
-
-			image[i][y0] = rounded_c0;
-
-			// choose between y0 and y0+1 (NE or E)
-
-			if (d * movementInImage <= 0)
-			{
-				d += (v1.vec.y - v2.vec.y); // move horizontally only
-			}
-			else
-			{ // move diagonally (NE)
-				d += (v1.vec.y - v2.vec.y) + (movementInImage * (v2.vec.x - v1.vec.x));
-				y0 += movementInImage;
-			}
-			c0 = colorAddition(c0, colorChange); // interpolate color
-		}
-	}
-}
-
-double f01(double x, double y, LineVec4 &v0, LineVec4 &v1)
-{
-	return (v0.vec.y - v1.vec.y) * x + (v1.vec.x - v0.vec.x) * y + v0.vec.x * v1.vec.y - v0.vec.y * v1.vec.x; // x(y0 - y1) + y(x1 - x0) + x0y1 - y0x1
-}
-
-double f12(double x, double y, LineVec4 &v1, LineVec4 &v2)
-{
-	return (v1.vec.y - v2.vec.y) * x + (v2.vec.x - v1.vec.x) * y + v1.vec.x * v2.vec.y - v1.vec.y * v2.vec.x; // x(y1 - y2) + y(x2 - x1) + x1y2 - y1x2
-}
-
-double f20(double x, double y, LineVec4 &v2, LineVec4 &v0)
-{
-	return (v2.vec.y - v0.vec.y) * x + (v0.vec.x - v2.vec.x) * y + v2.vec.x * v0.vec.y - v2.vec.y * v0.vec.x; // x(y2 - y0) + y(x0 - x2) + x2y0 - y2x0
-}
-
-void triangleRasterization(vector<vector<Color>> &image, LineVec4 &v0, LineVec4 &v1, LineVec4 &v2, int &maxFrameX, int &maxFrameY)
-{
-	// implementation from rasterization slides page 30
-
-	double x_min = std::min(v0.vec.x, std::min(v1.vec.x, v2.vec.x));
-	if (x_min < 0)
-	{
-		x_min = 0;
-	}
-	if (x_min > maxFrameX - 1)
-	{
-		x_min = maxFrameX - 1;
-	}
-	double x_max = std::max(v0.vec.x, std::max(v1.vec.x, v2.vec.x));
-	if (x_max < 0)
-	{
-		x_max = 0;
-	}
-	if (x_max > maxFrameX - 1)
-	{
-		x_max = maxFrameX - 1;
-	}
-	double y_min = std::min(v0.vec.y, std::min(v1.vec.y, v2.vec.y));
-	if (y_min < 0)
-	{
-		y_min = 0;
-	}
-	if (y_min > maxFrameY - 1)
-	{
-		y_min = maxFrameY - 1;
-	}
-	double y_max = std::max(v0.vec.y, std::max(v1.vec.y, v2.vec.y));
-	if (y_max < 0)
-	{
-		y_max = 0;
-	}
-	if (y_max > maxFrameY - 1)
-	{
-		y_max = maxFrameY - 1;
-	}
-
-	for (int y = y_min; y <= y_max; y++)
-	{
-		for (int x = x_min; x <= x_max; x++)
-		{
-			// TODO check this
-			double alpha = f12(x, y, v1, v2) / f12(v0.vec.x, v0.vec.y, v1, v2);
-			double beta = f20(x, y, v2, v0) / f20(v1.vec.x, v1.vec.y, v2, v0);
-			double gamma = f01(x, y, v0, v1) / f01(v2.vec.x, v2.vec.y, v0, v1);
-
-			if (alpha >= 0 && beta >= 0 && gamma >= 0)
-			{
-				Color color;
-				color.r = alpha * v0.color.r + beta * v1.color.r + gamma * v2.color.r;
-				color.g = alpha * v0.color.g + beta * v1.color.g + gamma * v2.color.g;
-				color.b = alpha * v0.color.b + beta * v1.color.b + gamma * v2.color.b;
-
-				Color rounded_color;
-				rounded_color.r = (int)(color.r + 0.5);
-				rounded_color.g = (int)(color.g + 0.5);
-				rounded_color.b = (int)(color.b + 0.5);
-
-				image[x][y] = rounded_color;
-			}
-		}
-	}
-}
-
-void Scene::forwardRenderingPipeline(Camera *camera)
-{
-	// TODO: Implement this function
-
-	bool cullingFlag = this->cullingEnabled;
-
-	// 1- calculate camera transformation matrix
-	Matrix4 camTransMatrix;
-	// formula from viewving transformation slides page 6
-	double tMatrix[4][4] = {{1, 0, 0, -(camera->position.x)},
-							{0, 1, 0, -(camera->position.y)},
-							{0, 0, 1, -(camera->position.z)},
-							{0, 0, 0, 1}};
-
-	// formula from viewving transformation slides page 7
-	double rMatrix[4][4] = {{camera->u.x, camera->u.y, camera->u.z, 0},
-							{camera->v.x, camera->v.y, camera->v.z, 0},
-							{camera->w.x, camera->w.y, camera->w.z, 0},
-							{0, 0, 0, 1}};
-
-	// formula from viewving transformation slides page 8
-	camTransMatrix = multiplyMatrixWithMatrix(rMatrix, tMatrix);
-
-	// 2- calculate orthographic or perspective projection transformation matrix
-	Matrix4 projTransMatrix;
-	if (camera->projectionType)
-	{
-		// calculate perspective projection transformation matrix
-		// formula from viewving transformation slides page 26
-		// TODO not sure about implementation of perspective divide check later didn't implemented here I believe .s
-		double temp[4][4] = {{2 * camera->near / (camera->right - camera->left), 0, (camera->right + camera->left) / (camera->right - camera->left), 0},
-							 {0, 2 * camera->near / (camera->top - camera->bottom), (camera->top + camera->bottom) / (camera->top - camera->bottom), 0},
-							 {0, 0, -(camera->far + camera->near) / (camera->far - camera->near), -2 * camera->far * camera->near / (camera->far - camera->near)},
-							 {0, 0, -1, 0}};
-
-		projTransMatrix = Matrix4(temp);
-	}
-	else
-	{
-		// calculate orthographic projection transformation matrix
-		// formula from viewing transformation slides page 14
-		double temp[4][4] = {{2 / (camera->right - camera->left), 0, 0, -(camera->right + camera->left) / (camera->right - camera->left)},
-							 {0, 2 / (camera->top - camera->bottom), 0, -(camera->top + camera->bottom) / (camera->top - camera->bottom)},
-							 {0, 0, -2 / (camera->far - camera->near), -(camera->far + camera->near) / (camera->far - camera->near)},
-							 {0, 0, 0, 1}};
-		projTransMatrix = Matrix4(temp);
-	}
-
-	// 3- calculate viewport transformation matrix
-	double tmpMvp[4][4] = {{camera->horRes / (double)2, 0, 0, (camera->horRes - 1) / (double)2},
-						   {0, camera->verRes / (double)2, 0, (camera->verRes - 1) / (double)2},
-						   {0, 0, 0.5, 0.5},
-						   {0, 0, 0, 1}};
-	Matrix4 viewportMatrix = Matrix4(tmpMvp);
-
-	// iterate through all meshes
-	for (auto &currentMesh : this->meshes)
-	{
-		// 4- implement modelling transformation
-		Matrix4 modellingMatrix = getIdentityMatrix();
-		// iterate through all modelling transformations of current mesh
-		for (int i = 0; i < currentMesh->numberOfTransformations; i++)
-		{
-			if (currentMesh->transformationTypes[i] == 'r')
-			{
-				Vec3 tmpVec = {this->rotations[currentMesh->transformationIds[i] - 1]->ux,
-							   this->rotations[currentMesh->transformationIds[i] - 1]->uy,
-							   this->rotations[currentMesh->transformationIds[i] - 1]->uz};
-				tmpVec = normalizeVec3(tmpVec);
-
-				// smallest component of v
-				double min = std::min(abs(tmpVec.y), abs(tmpVec.z));
-				if (abs(tmpVec.x) < min)
-				{
-					min = abs(tmpVec.x);
-				}
-
-				Vec3 v, w;
-
-				if (min == abs(tmpVec.x))
-				{
-					v.x = 0;
-					v.y = -tmpVec.z;
-					v.z = tmpVec.y;
-				}
-				else if (min == abs(tmpVec.y))
-				{
-					v.x = -tmpVec.z;
-					v.y = 0;
-					v.z = tmpVec.x;
-				}
-				else
-				{
-					v.x = -tmpVec.y;
-					v.y = tmpVec.x;
-					v.z = 0;
-				}
-
-				v = normalizeVec3(v);
-				w = crossProductVec3(tmpVec, v);
-
-				double rotationMatrix[4][4] = {{tmpVec.x, tmpVec.y, tmpVec.z, 0},
-											   {v.x, v.y, v.z, 0},
-											   {w.x, w.y, w.z, 0},
-											   {0, 0, 0, 1}};
-				double inverseRotationMatrix[4][4] = {{tmpVec.x, v.x, w.x, 0},
-													  {tmpVec.y, v.y, w.y, 0},
-													  {tmpVec.z, v.z, w.z, 0},
-													  {0, 0, 0, 1}};
-
-				// now we are on x-axis no problem if we rotate around x-axis
-				// TODO check correctness of this
-				double rotationAngleTheta = rotationAngleTheta * M_PI / 180;
-				double rotationMatrix2[4][4] = {{1, 0, 0, 0},
-												{0, cos(rotationAngleTheta), -sin(rotationAngleTheta), 0},
-												{0, sin(rotationAngleTheta), cos(rotationAngleTheta), 0},
-												{0, 0, 0, 1}};
-
-				Matrix4 firstRotationMatrix = multiplyMatrixWithMatrix(Matrix4(rotationMatrix2), Matrix4(rotationMatrix));
-				Matrix4 secondRotationMatrix = multiplyMatrixWithMatrix(Matrix4(inverseRotationMatrix), firstRotationMatrix);
-				modellingMatrix = multiplyMatrixWithMatrix(secondRotationMatrix, modellingMatrix);
-			}
-
-			if (currentMesh->transformationTypes[i] == 't')
-			{
-				double translationMatrix[4][4] = {{1, 0, 0, this->translations[currentMesh->transformationIds[i] - 1]->tx},
-												  {0, 1, 0, this->translations[currentMesh->transformationIds[i] - 1]->ty},
-												  {0, 0, 1, this->translations[currentMesh->transformationIds[i] - 1]->tz},
-												  {0, 0, 0, 1}};
-				modellingMatrix = multiplyMatrixWithMatrix(modellingMatrix, Matrix4(translationMatrix));
-			}
-
-			if (currentMesh->transformationTypes[i] == 's')
-			{
-				double scalingMatrix[4][4] = {{this->scalings[currentMesh->transformationIds[i] - 1]->sx, 0, 0, 0},
-											  {0, this->scalings[currentMesh->transformationIds[i] - 1]->sy, 0, 0},
-											  {0, 0, this->scalings[currentMesh->transformationIds[i] - 1]->sz, 0},
-											  {0, 0, 0, 1}};
-				modellingMatrix = multiplyMatrixWithMatrix(modellingMatrix, Matrix4(scalingMatrix));
-			}
-		}
-		Matrix4 allMatrices = multiplyMatrixWithMatrix(camTransMatrix, modellingMatrix);
-		allMatrices = multiplyMatrixWithMatrix(allMatrices, projTransMatrix); // projection matrix * camera matrix * modelling matrix
-		for (auto &currentTriangle : currentMesh->triangles)
-		{
-			// create projected triangle
-			Vec3 *vector0 = this->vertices[currentTriangle.vertexIds[0] - 1];
-			Vec3 *vector1 = this->vertices[currentTriangle.vertexIds[1] - 1];
-			Vec3 *vector2 = this->vertices[currentTriangle.vertexIds[2] - 1];
-
-			// check culling if culling is enabled
-			if (cullingFlag)
-			{
-				// check if mesh is backfacing the camera
-				// in this case just skip this mesh
-				// calculate normal vector of triangle
-				Vec3 normal = crossProductVec3(subtractVec3(*vector1, *vector0),
-											   subtractVec3(*vector2, *vector0));
-				normal = normalizeVec3(normal);
-				// TODO check this implementation
-				// double resultingDotProduct = dotProductVec3(camera->position, normal);
-				double resultingDotProduct = dotProductVec3(normal, *vector0);
-				if (resultingDotProduct > 0)
-				{
-					continue; // skip the mesh
-				}
-			}
-
-			// raw vectors before transformation
-			Vec4 unprocessedVector0 = Vec4(vector0->x, vector0->y, vector0->z, 1, vector0->colorId);
-			Vec4 unprocessedVector1 = Vec4(vector1->x, vector1->y, vector1->z, 1, vector1->colorId);
-			Vec4 unprocessedVector2 = Vec4(vector2->x, vector2->y, vector2->z, 1, vector2->colorId);
-
-			// transformed vectors after transformation we will use these vectors for clipping
-			Vec4 transformedVector0 = multiplyMatrixWithVec4(allMatrices, unprocessedVector0);
-			Vec4 transformedVector1 = multiplyMatrixWithVec4(allMatrices, unprocessedVector1);
-			Vec4 transformedVector2 = multiplyMatrixWithVec4(allMatrices, unprocessedVector2);
-
-			// we need to use clipping only if we are using wireframe mode
-			// check wireframe => 0 for wireframe 1 for solid
-			if (currentMesh->type)
-			{
-				// TODO implement solid mode
-
-				// perspective divison time
-				perspectiveDivide(transformedVector0);
-				perspectiveDivide(transformedVector1);
-				perspectiveDivide(transformedVector2);
-
-				// implement vp transformations now (perspective divide already done)
-				transformedVector0 = multiplyMatrixWithVec4(viewportMatrix, transformedVector0);
-				transformedVector1 = multiplyMatrixWithVec4(viewportMatrix, transformedVector1);
-				transformedVector2 = multiplyMatrixWithVec4(viewportMatrix, transformedVector2);
-
-				// TODO implement rasterization
-				LineVec4 line01 = LineVec4(transformedVector0, *this->colorsOfVertices[vector0->colorId - 1]);
-				LineVec4 line12 = LineVec4(transformedVector1, *this->colorsOfVertices[vector1->colorId - 1]);
-				LineVec4 line20 = LineVec4(transformedVector2, *this->colorsOfVertices[vector2->colorId - 1]);
-				triangleRasterization(this->image, line01, line12, line20, camera->horRes, camera->verRes);
-			}
-			else
-			{
-				// TODO implement wireframe mode
-				// Liang-Barsky algorithm (faster than Cohen-Sutherland)
-				// we got 3 lines for each triangle
-
-				// perspective divison time
-				perspectiveDivide(transformedVector0);
-				perspectiveDivide(transformedVector1);
-				perspectiveDivide(transformedVector2);
-
-				// Create line 0-1 and 1-2 and 2-0 (logical triangle)
-				LineVec4 line01 = LineVec4(transformedVector0, *this->colorsOfVertices[vector0->colorId - 1]);
-				LineVec4 line10 = LineVec4(transformedVector1, *this->colorsOfVertices[vector1->colorId - 1]);
-				bool visibility01 = lineClipping(line01, line10);
-
-				LineVec4 line12 = LineVec4(transformedVector1, *this->colorsOfVertices[vector1->colorId - 1]);
-				LineVec4 line21 = LineVec4(transformedVector2, *this->colorsOfVertices[vector2->colorId - 1]);
-				bool visibility12 = lineClipping(line12, line21);
-
-				LineVec4 line20 = LineVec4(transformedVector2, *this->colorsOfVertices[vector2->colorId - 1]);
-				LineVec4 line02 = LineVec4(transformedVector0, *this->colorsOfVertices[vector0->colorId - 1]);
-				bool visibility20 = lineClipping(line20, line02);
-
-				// implement vp transformations now (perspective divide already done)
-				transformedVector0 = multiplyMatrixWithVec4(viewportMatrix, transformedVector0);
-				transformedVector1 = multiplyMatrixWithVec4(viewportMatrix, transformedVector1);
-				transformedVector2 = multiplyMatrixWithVec4(viewportMatrix, transformedVector2);
-
-				// TODO implement rasterization
-				if (visibility01)
-				{
-					lineRasterization(this->image, line01, line10);
-				}
-				if (visibility12)
-				{
-					lineRasterization(this->image, line12, line21);
-				}
-				if (visibility20)
-				{
-					lineRasterization(this->image, line20, line02);
-				}
-			}
-			// TODO implement z-buffering have no idea how to do this
-		}
-	}
 }

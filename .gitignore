@@ -1,3 +1,5 @@
 .vscode
 raytracer
 *.ppm
+*.png
+rasterizer
