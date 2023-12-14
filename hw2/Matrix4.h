@@ -9,7 +9,7 @@ public:
     Matrix4();
     Matrix4(double values[4][4]);
     Matrix4(const Matrix4 &other);
-    friend std::ostream &operator<<(std::ostream &os, const Matrix4 &m);
+    // friend std::ostream &operator<<(std::ostream &os, const Matrix4 &m);
 };
 
 #endif

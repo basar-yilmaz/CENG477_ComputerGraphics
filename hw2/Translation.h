@@ -9,7 +9,7 @@ public:
 
     Translation();
     Translation(int translationId, double tx, double ty, double tz);
-    friend std::ostream &operator<<(std::ostream &os, const Translation &t);
+    // friend std::ostream &operator<<(std::ostream &os, const Translation &t);
 };
 
 #endif

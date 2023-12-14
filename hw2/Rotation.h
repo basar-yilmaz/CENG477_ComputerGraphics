@@ -9,7 +9,7 @@ public:
 
     Rotation();
     Rotation(int rotationId, double angle, double x, double y, double z);
-    friend std::ostream &operator<<(std::ostream &os, const Rotation &r);
+    // friend std::ostream &operator<<(std::ostream &os, const Rotation &r);
 };
 
 #endif

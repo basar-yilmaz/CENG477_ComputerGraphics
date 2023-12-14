@@ -22,8 +22,8 @@ Triangle::Triangle(const Triangle &other)
     this->vertexIds[2] = other.vertexIds[2];
 }
 
-std::ostream &operator<<(std::ostream &os, const Triangle &t)
-{
-    os << std::fixed << std::setprecision(0) << "Triangle with vertices (" << t.vertexIds[0] << ", " << t.vertexIds[1] << ", " << t.vertexIds[2] << ")";
-    return os;
-}
+// std::ostream &operator<<(std::ostream &os, const Triangle &t)
+// {
+//     os << std::fixed << std::setprecision(0) << "Triangle with vertices (" << t.vertexIds[0] << ", " << t.vertexIds[1] << ", " << t.vertexIds[2] << ")";
+//     return os;
+// }

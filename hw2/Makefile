@@ -1,2 +1,11 @@
-all:
-	g++ *.cpp -O3 -o raytracer -std=c++11
+CXX = g++
+CXXFLAGS = -std=c++11 -O3 -g
+
+# Default target
+all: rasterizer
+
+rasterizer: *.cpp
+	$(CXX) $^ $(CXXFLAGS) -o $@
+
+clean:
+	rm -f rasterizer

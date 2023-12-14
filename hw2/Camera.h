@@ -26,7 +26,7 @@ public:
 
     Camera(const Camera &other);
 
-    friend std::ostream &operator<<(std::ostream &os, const Camera &c);
+    // friend std::ostream &operator<<(std::ostream &os, const Camera &c);
 };
 
 #endif

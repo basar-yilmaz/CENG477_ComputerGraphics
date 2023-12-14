@@ -51,14 +51,14 @@ Camera::Camera(const Camera &other)
     this->outputFilename = other.outputFilename;
 }
 
-std::ostream &operator<<(std::ostream &os, const Camera &c)
-{
-    const char *camType = c.projectionType ? "perspective" : "orthographic";
+// std::ostream &operator<<(std::ostream &os, const Camera &c)
+// {
+//     const char *camType = c.projectionType ? "perspective" : "orthographic";
 
-    os << std::fixed << std::setprecision(6) << "Camera " << c.cameraId << " (" << camType << ") => pos: " << c.position << " gaze: " << c.gaze << std::endl
-       << "\tu: " << c.u << " v: " << c.v << " w: " << c.w << std::endl
-       << std::fixed << std::setprecision(3) << "\tleft: " << c.left << " right: " << c.right << " bottom: " << c.bottom << " top: " << c.top << std::endl
-       << "\tnear: " << c.near << " far: " << c.far << " resolutions: " << c.horRes << "x" << c.verRes << " fileName: " << c.outputFilename;
+//     os << std::fixed << std::setprecision(6) << "Camera " << c.cameraId << " (" << camType << ") => pos: " << c.position << " gaze: " << c.gaze << std::endl
+//        << "\tu: " << c.u << " v: " << c.v << " w: " << c.w << std::endl
+//        << std::fixed << std::setprecision(3) << "\tleft: " << c.left << " right: " << c.right << " bottom: " << c.bottom << " top: " << c.top << std::endl
+//        << "\tnear: " << c.near << " far: " << c.far << " resolutions: " << c.horRes << "x" << c.verRes << " fileName: " << c.outputFilename;
 
-    return os;
-}
+//     return os;
+// }

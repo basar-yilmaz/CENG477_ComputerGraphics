@@ -20,7 +20,7 @@ public:
          int numberOfTriangles,
          std::vector<Triangle> triangles);
 
-    friend std::ostream &operator<<(std::ostream &os, const Mesh &m);
+    // friend std::ostream &operator<<(std::ostream &os, const Mesh &m);
 };
 
 #endif

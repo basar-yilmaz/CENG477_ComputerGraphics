@@ -7,6 +7,7 @@ Vec3::Vec3()
     this->y = 0.0;
     this->z = 0.0;
     this->colorId = NO_COLOR;
+    this->color = Color(0, 0, 0);
 }
 
 Vec3::Vec3(double x, double y, double z)
@@ -15,6 +16,7 @@ Vec3::Vec3(double x, double y, double z)
     this->y = y;
     this->z = z;
     this->colorId = NO_COLOR;
+    this->color = Color(0, 0, 0);
 }
 
 Vec3::Vec3(double x, double y, double z, int colorId)
@@ -23,6 +25,16 @@ Vec3::Vec3(double x, double y, double z, int colorId)
     this->y = y;
     this->z = z;
     this->colorId = colorId;
+    this->color = Color(0, 0, 0);
+}
+
+Vec3::Vec3(double x, double y, double z, Color color)
+{
+    this->x = x;
+    this->y = y;
+    this->z = z;
+    this->colorId = NO_COLOR;
+    this->color = color;
 }
 
 Vec3::Vec3(const Vec3 &other)
@@ -31,6 +43,7 @@ Vec3::Vec3(const Vec3 &other)
     this->y = other.y;
     this->z = other.z;
     this->colorId = other.colorId;
+    this->color = other.color;
 }
 
 double Vec3::getNthComponent(int n)
@@ -49,8 +62,8 @@ double Vec3::getNthComponent(int n)
     }
 }
 
-std::ostream &operator<<(std::ostream &os, const Vec3 &v)
-{
-    os << std::fixed << std::setprecision(6) << "[" << v.x << ", " << v.y << ", " << v.z << "]";
-    return os;
-}
+// std::ostream &operator<<(std::ostream &os, const Vec3 &v)
+// {
+//     os << std::fixed << std::setprecision(6) << "[" << v.x << ", " << v.y << ", " << v.z << "]";
+//     return os;
+// }

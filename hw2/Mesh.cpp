@@ -19,28 +19,28 @@ Mesh::Mesh(int meshId, int type, int numberOfTransformations,
     this->triangles = triangles;
 }
 
-std::ostream &operator<<(std::ostream &os, const Mesh &m)
-{
-    os << "Mesh " << m.meshId;
+// std::ostream &operator<<(std::ostream &os, const Mesh &m)
+// {
+//     os << "Mesh " << m.meshId;
 
-    if (m.type == 0)
-    {
-        os << " wireframe(0) with ";
-    }
-    else
-    {
-        os << " solid(1) with ";
-    }
+//     if (m.type == 0)
+//     {
+//         os << " wireframe(0) with ";
+//     }
+//     else
+//     {
+//         os << " solid(1) with ";
+//     }
 
-    os << std::fixed << std::setprecision(3) << m.numberOfTransformations << " transformations and " << m.numberOfTriangles << " triangles"
-       << std::endl
-       << "\tTriangles are:" << std::endl
-       << std::fixed << std::setprecision(0);
+//     os << std::fixed << std::setprecision(3) << m.numberOfTransformations << " transformations and " << m.numberOfTriangles << " triangles"
+//        << std::endl
+//        << "\tTriangles are:" << std::endl
+//        << std::fixed << std::setprecision(0);
 
-    for (int i = 0; i < m.triangles.size(); i++)
-    {
-        os << "\t\t" << m.triangles[i].vertexIds[0] << " " << m.triangles[i].vertexIds[1] << " " << m.triangles[i].vertexIds[2] << std::endl;
-    }
+//     for (int i = 0; i < m.triangles.size(); i++)
+//     {
+//         os << "\t\t" << m.triangles[i].vertexIds[0] << " " << m.triangles[i].vertexIds[1] << " " << m.triangles[i].vertexIds[2] << std::endl;
+//     }
 
-    return os;
-}
+//     return os;
+// }

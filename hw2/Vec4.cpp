@@ -8,6 +8,17 @@ Vec4::Vec4()
     this->z = 0.0;
     this->t = 0.0;
     this->colorId = NO_COLOR;
+    this->color = Color(0, 0, 0);
+}
+
+Vec4::Vec4(double x, double y, double z, double t, Color color)
+{
+    this->x = x;
+    this->y = y;
+    this->z = z;
+    this->t = t;
+    this->colorId = NO_COLOR;
+    this->color = color;
 }
 
 Vec4::Vec4(double x, double y, double z, double t)
@@ -26,6 +37,7 @@ Vec4::Vec4(double x, double y, double z, double t, int colorId)
     this->z = z;
     this->t = t;
     this->colorId = colorId;
+    this->color = Color(0, 0, 0);
 }
 
 Vec4::Vec4(const Vec4 &other)
@@ -35,6 +47,7 @@ Vec4::Vec4(const Vec4 &other)
     this->z = other.z;
     this->t = other.t;
     this->colorId = other.colorId;
+    this->color = other.color;
 }
 
 double Vec4::getNthComponent(int n)
@@ -56,8 +69,9 @@ double Vec4::getNthComponent(int n)
     }
 }
 
-std::ostream &operator<<(std::ostream &os, const Vec4 &v)
-{
-    os << std::fixed << std::setprecision(6) << "[" << v.x << ", " << v.y << ", " << v.z << ", " << v.t << "]";
-    return os;
-}
+
+// std::ostream &operator<<(std::ostream &os, const Vec4 &v)
+// {
+//     os << std::fixed << std::setprecision(6) << "[" << v.x << ", " << v.y << ", " << v.z << ", " << v.t << "]";
+//     return os;
+// }
