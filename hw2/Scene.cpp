@@ -298,7 +298,9 @@ void Scene::lineRasterization(std::pair<Vec3, Vec3> &vertices)
 	double dy = vertices.second.y - vertices.first.y;
 	int movementInImage = 1; //
 	Color colorChange;
-
+	double depthChange = vertices.second.z - vertices.first.z;
+	double depthIncrement;
+	double currentDepth;
 	// we need to implement modified rasterization algorithm
 	// since the slope of the line may be greater than 1
 	// implementation similar to rasterization slides page 22
@@ -317,6 +319,8 @@ void Scene::lineRasterization(std::pair<Vec3, Vec3> &vertices)
 		}
 
 		movementInImage = -1 ? vertices.second.x < vertices.first.x : 1;
+		depthIncrement = depthChange / std::abs(dy);
+		currentDepth = vertices.first.z;
 
 		int x0 = vertices.first.x;
 		Color c0 = vertices.first.color;
@@ -331,7 +335,11 @@ void Scene::lineRasterization(std::pair<Vec3, Vec3> &vertices)
 			rounded_c0.r = (int)(c0.r + 0.5);
 			rounded_c0.g = (int)(c0.g + 0.5);
 			rounded_c0.b = (int)(c0.b + 0.5);
+			if (currentDepth < depth[x0][i]) {
+				depth[x0][i] = currentDepth;
+			}
 
+			currentDepth += depthIncrement;
 			image[x0][i] = rounded_c0;
 
 			// choose between x0 and x0+1 (NE or E)
@@ -362,6 +370,9 @@ void Scene::lineRasterization(std::pair<Vec3, Vec3> &vertices)
 
 		movementInImage = -1 ? vertices.second.y < vertices.first.y : 1;
 
+		depthIncrement = depthChange / std::abs(dx);
+		currentDepth = vertices.first.z;
+
 		int y0 = vertices.first.y;
 		Color c0 = vertices.first.color;
 		int d = (vertices.first.y - vertices.second.y) + (movementInImage * 0.5 * (vertices.second.x - vertices.first.x));
@@ -375,6 +386,10 @@ void Scene::lineRasterization(std::pair<Vec3, Vec3> &vertices)
 			rounded_c0.r = (int)(c0.r + 0.5);
 			rounded_c0.g = (int)(c0.g + 0.5);
 			rounded_c0.b = (int)(c0.b + 0.5);
+			if (currentDepth < depth[i][y0]) {
+				depth[i][y0] = currentDepth;
+			}
+			currentDepth += depthIncrement;
 
 			image[i][y0] = rounded_c0;
 
@@ -468,17 +483,22 @@ void Scene::triangleRasterization(vector<Vec3> &vertices, int maxFrameX, int max
 
 			if (alpha >= 0 && beta >= 0 && gamma >= 0)
 			{
-				Color color;
-				color.r = alpha * vertices[0].color.r + beta * vertices[1].color.r + gamma * vertices[2].color.r;
-				color.g = alpha * vertices[0].color.g + beta * vertices[1].color.g + gamma * vertices[2].color.g;
-				color.b = alpha * vertices[0].color.b + beta * vertices[1].color.b + gamma * vertices[2].color.b;
+				double z = alpha * vertices[0].z + beta * vertices[1].z + gamma * vertices[2].z;
 
-				Color rounded_color;
-				rounded_color.r = (int)(color.r + 0.5);
-				rounded_color.g = (int)(color.g + 0.5);
-				rounded_color.b = (int)(color.b + 0.5);
+				if (z < depth[x][y]) {  // Depth buffer check
+					depth[x][y] = z;   // Update depth buffer
+					Color color;
+					color.r = alpha * vertices[0].color.r + beta * vertices[1].color.r + gamma * vertices[2].color.r;
+					color.g = alpha * vertices[0].color.g + beta * vertices[1].color.g + gamma * vertices[2].color.g;
+					color.b = alpha * vertices[0].color.b + beta * vertices[1].color.b + gamma * vertices[2].color.b;
 
-				image[x][y] = rounded_color;
+					Color rounded_color;
+					rounded_color.r = (int)(color.r + 0.5);
+					rounded_color.g = (int)(color.g + 0.5);
+					rounded_color.b = (int)(color.b + 0.5);
+
+					image[x][y] = rounded_color;
+				}
 			}
 		}
 	}
@@ -889,9 +909,9 @@ void Scene::initializeImage(Camera *camera)
 			for (int j = 0; j < camera->verRes; j++)
 			{
 				assignColorToPixel(i, j, this->backgroundColor);
-				this->depth[i][j] = 1.01;
-				this->depth[i][j] = 1.01;
-				this->depth[i][j] = 1.01;
+				this->depth[i][j] =1.01;
+				this->depth[i][j] =1.01;
+				this->depth[i][j] =1.01;
 			}
 		}
 	}
