@@ -318,14 +318,14 @@ void Scene::lineRasterization(std::pair<Vec3, Vec3> &vertices)
 			vertices.second = tmp;
 		}
 
-		movementInImage = -1 ? vertices.second.x < vertices.first.x : 1;
-		//movementInImage = vertices.second.x < vertices.first.x ? 0 : 1;
+		// movementInImage = -1 ? vertices.second.x < vertices.first.x : 1;
+		movementInImage = vertices.second.x < vertices.first.x ? -1 : 1;
 		depthIncrement = depthChange / std::abs(dy);
 		currentDepth = vertices.first.z;
 
 		int x0 = vertices.first.x;
 		Color c0 = vertices.first.color;
-		int d = (vertices.first.x - vertices.second.x) + (movementInImage * 0.5 * (vertices.second.y - vertices.first.y));
+		int d = (vertices.first.x - vertices.second.x) + (movementInImage * 0.5 * (vertices.first.y - vertices.second.y));
 		Color tempDiff = colorDifference(vertices.second.color, vertices.first.color);
 		colorChange = colorDivision(tempDiff, vertices.second.y - vertices.first.y); // skip alpha value by directly computing color increment
 
@@ -347,11 +347,11 @@ void Scene::lineRasterization(std::pair<Vec3, Vec3> &vertices)
 
 			if (d * movementInImage <= 0)
 			{
-				d += (vertices.first.y - vertices.second.y); // move horizontally only
+				d += (vertices.first.x - vertices.second.x); // move horizontally only
 			}
 			else
 			{ // move diagonally (NE)
-				d += (vertices.first.y - vertices.second.y) + (movementInImage * (vertices.second.x - vertices.first.x));
+				d += (vertices.first.x - vertices.second.x) + (movementInImage * (vertices.second.y - vertices.first.y));
 				x0 += movementInImage;
 			}
 			c0 = colorAddition(c0, colorChange); // interpolate color
@@ -369,8 +369,8 @@ void Scene::lineRasterization(std::pair<Vec3, Vec3> &vertices)
 			vertices.second = tmp;
 		}
 
-		movementInImage = -1 ? vertices.second.y < vertices.first.y : 1;
-		//movementInImage = vertices.second.y < vertices.first.y ? -1 : 1;
+		// movementInImage = -1 ? vertices.second.y < vertices.first.y : 1;
+		movementInImage = vertices.second.y < vertices.first.y ? -1 : 1;
 		depthIncrement = depthChange / std::abs(dx);
 		currentDepth = vertices.first.z;
 
@@ -396,7 +396,7 @@ void Scene::lineRasterization(std::pair<Vec3, Vec3> &vertices)
 
 			// choose between y0 and y0+1 (NE or E)
 
-			if (d * movementInImage <= 0)
+			if (d * movementInImage >= 0)
 			{
 				d += (vertices.first.y - vertices.second.y); // move horizontally only
 			}
