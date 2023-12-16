@@ -36,7 +36,7 @@ Matrix4 Scene::modellingTransformations(Mesh *mesh)
 					{rotate1->uy * rotate1->ux * (1. - cos(angle)) + rotate1->uz * sin(angle), cos(angle) + (rotate1->uy * rotate1->uy) * (1. - cos(angle)), rotate1->uy * rotate1->uz * (1. - cos(angle)) - rotate1->ux * sin(angle), 0},
 					{rotate1->uz * rotate1->ux * (1. - cos(angle)) - rotate1->uy * sin(angle), rotate1->uz * rotate1->uy * (1. - cos(angle)) + rotate1->ux * sin(angle), cos(angle) + (rotate1->uz * rotate1->uz) * (1. - cos(angle)), 0},
 					{0, 0, 0, 1}};
-			modellingMatrix = multiplyMatrixWithMatrix(modellingMatrix, Matrix4(rotationMatrix));
+			modellingMatrix = multiplyMatrixWithMatrix(Matrix4(rotationMatrix),modellingMatrix);
 		}
 
 		// translation
@@ -47,7 +47,7 @@ Matrix4 Scene::modellingTransformations(Mesh *mesh)
 											  {0, 1, 0, translation1->ty},
 											  {0, 0, 1, translation1->tz},
 											  {0, 0, 0, 1}};
-			modellingMatrix = multiplyMatrixWithMatrix(modellingMatrix, Matrix4(translationMatrix));
+			modellingMatrix = multiplyMatrixWithMatrix(Matrix4(translationMatrix),modellingMatrix);
 		}
 
 		// scaling
@@ -58,7 +58,7 @@ Matrix4 Scene::modellingTransformations(Mesh *mesh)
 										  {0, scale1->sy, 0, 0},
 										  {0, 0, scale1->sz, 0},
 										  {0, 0, 0, 1}};
-			modellingMatrix = multiplyMatrixWithMatrix(modellingMatrix, Matrix4(scalingMatrix));
+			modellingMatrix = multiplyMatrixWithMatrix(Matrix4(scalingMatrix),modellingMatrix);
 		}
 	}
 	return modellingMatrix;
@@ -71,7 +71,7 @@ Matrix4 Scene::orthTransformation(Camera *camera)
 {
 	double temp[4][4] = {{2 / (camera->right - camera->left), 0, 0, -(camera->right + camera->left) / (camera->right - camera->left)},
 						 {0, 2 / (camera->top - camera->bottom), 0, -(camera->top + camera->bottom) / (camera->top - camera->bottom)},
-						 {0, 0, -2 / (camera->far - camera->near), -(camera->far + camera->near) / (camera->far - camera->near)},
+						 {0, 0, -2 / (camera->far - camera->near), -(camera->near + camera->far) / (camera->near + camera->far)},
 						 {0, 0, 0, 1}};
 	return Matrix4(temp);
 }
@@ -131,8 +131,8 @@ Matrix4 Scene::viewTransformation(Camera *camera)
 {
 	double temp[4][4] = {{camera->horRes / (double)2, 0, 0, (camera->horRes - 1) / (double)2},
 						 {0, camera->verRes / (double)2, 0, (camera->verRes - 1) / (double)2},
-						 {0, 0, (double)0.5, (double)0.5},
-						 {0, 0, 0, 0}}; // not sure maybe {0, 0, 0, 1}
+						 {0, 0, (double)0.5, 0},
+						 {0, 0, 0, 1}}; // not sure maybe {0, 0, 0, 1}
 	return Matrix4(temp);
 }
 /*
@@ -318,16 +318,16 @@ void Scene::lineRasterization(std::pair<Vec3, Vec3> &vertices)
 			vertices.second = tmp;
 		}
 
-		movementInImage = -1 ? vertices.second.x < vertices.first.x : 1;
+		// movementInImage = -1 ? vertices.second.x < vertices.first.x : 1;
+		movementInImage = vertices.second.x < vertices.first.x ? -1 : 1;
 		depthIncrement = depthChange / std::abs(dy);
 		currentDepth = vertices.first.z;
 
 		int x0 = vertices.first.x;
 		Color c0 = vertices.first.color;
-		int d = (vertices.first.x - vertices.second.x) + (movementInImage * 0.5 * (vertices.second.y - vertices.first.y));
+		int d = (vertices.first.x - vertices.second.x) + (movementInImage * 0.5 * (vertices.first.y - vertices.second.y));
 		Color tempDiff = colorDifference(vertices.second.color, vertices.first.color);
 		colorChange = colorDivision(tempDiff, vertices.second.y - vertices.first.y); // skip alpha value by directly computing color increment
-
 		// we got our constants now iterate through whole y values
 		for (int i = vertices.first.y; i <= vertices.second.y; i++)
 		{
@@ -346,11 +346,11 @@ void Scene::lineRasterization(std::pair<Vec3, Vec3> &vertices)
 
 			if (d * movementInImage <= 0)
 			{
-				d += (vertices.first.y - vertices.second.y); // move horizontally only
+				d += (vertices.second.x - vertices.first.x); // move horizontally only
 			}
 			else
 			{ // move diagonally (NE)
-				d += (vertices.first.y - vertices.second.y) + (movementInImage * (vertices.second.x - vertices.first.x));
+				d += (vertices.second.x - vertices.first.x) + (movementInImage * (vertices.first.y - vertices.second.y));
 				x0 += movementInImage;
 			}
 			c0 = colorAddition(c0, colorChange); // interpolate color
@@ -368,8 +368,8 @@ void Scene::lineRasterization(std::pair<Vec3, Vec3> &vertices)
 			vertices.second = tmp;
 		}
 
-		movementInImage = -1 ? vertices.second.y < vertices.first.y : 1;
-
+		// movementInImage = -1 ? vertices.second.y < vertices.first.y : 1;
+		movementInImage = vertices.second.y < vertices.first.y ? -1 : 1;
 		depthIncrement = depthChange / std::abs(dx);
 		currentDepth = vertices.first.z;
 
@@ -395,7 +395,7 @@ void Scene::lineRasterization(std::pair<Vec3, Vec3> &vertices)
 
 			// choose between y0 and y0+1 (NE or E)
 
-			if (d * movementInImage <= 0)
+			if (d * movementInImage >= 0)
 			{
 				d += (vertices.first.y - vertices.second.y); // move horizontally only
 			}
@@ -586,6 +586,7 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 			}
 			else
 			{
+
 				// wireframe mode
 				LineVec4 v0 = LineVec4(verticesArray[0], verticesArray[1]);
 				LineVec4 v1 = LineVec4(verticesArray[1], verticesArray[2]);
@@ -602,8 +603,8 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 					Vec4 tempMatrix1 = multiplyMatrixWithVec4(viewingTransformationMatrix, v0.vertex1);
 					Vec3 viewportedVertex0 = Vec3(tempMatrix1.x, tempMatrix1.y, tempMatrix1.z, v0.vertex1.color);
 
-					Vec4 tempMatrix2 = multiplyMatrixWithVec4(viewingTransformationMatrix, v0.vertex1);
-					Vec3 viewportedVertex1 = Vec3(tempMatrix2.x, tempMatrix2.y, tempMatrix2.z, v1.vertex2.color);
+					Vec4 tempMatrix2 = multiplyMatrixWithVec4(viewingTransformationMatrix, v0.vertex2);
+					Vec3 viewportedVertex1 = Vec3(tempMatrix2.x, tempMatrix2.y, tempMatrix2.z, v0.vertex2.color);
 
 					std::pair<Vec3, Vec3> viewportedVertices = std::make_pair(viewportedVertex0, viewportedVertex1);
 
@@ -616,7 +617,7 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 					Vec4 tempMatrix1 = multiplyMatrixWithVec4(viewingTransformationMatrix, v1.vertex1);
 					Vec3 viewportedVertex0 = Vec3(tempMatrix1.x, tempMatrix1.y, tempMatrix1.z, v1.vertex1.color);
 
-					Vec4 tempMatrix2 = multiplyMatrixWithVec4(viewingTransformationMatrix, v1.vertex1);
+					Vec4 tempMatrix2 = multiplyMatrixWithVec4(viewingTransformationMatrix, v1.vertex2);
 					Vec3 viewportedVertex1 = Vec3(tempMatrix2.x, tempMatrix2.y, tempMatrix2.z, v1.vertex2.color);
 
 					std::pair<Vec3, Vec3> viewportedVertices = std::make_pair(viewportedVertex0, viewportedVertex1);
@@ -630,7 +631,7 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 					Vec4 tempMatrix1 = multiplyMatrixWithVec4(viewingTransformationMatrix, v2.vertex1);
 					Vec3 viewportedVertex0 = Vec3(tempMatrix1.x, tempMatrix1.y, tempMatrix1.z, v2.vertex1.color);
 
-					Vec4 tempMatrix2 = multiplyMatrixWithVec4(viewingTransformationMatrix, v2.vertex1);
+					Vec4 tempMatrix2 = multiplyMatrixWithVec4(viewingTransformationMatrix, v2.vertex2);
 					Vec3 viewportedVertex1 = Vec3(tempMatrix2.x, tempMatrix2.y, tempMatrix2.z, v2.vertex2.color);
 
 					std::pair<Vec3, Vec3> viewportedVertices = std::make_pair(viewportedVertex0, viewportedVertex1);
