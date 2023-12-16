@@ -328,7 +328,6 @@ void Scene::lineRasterization(std::pair<Vec3, Vec3> &vertices)
 		int d = (vertices.first.x - vertices.second.x) + (movementInImage * 0.5 * (vertices.first.y - vertices.second.y));
 		Color tempDiff = colorDifference(vertices.second.color, vertices.first.color);
 		colorChange = colorDivision(tempDiff, vertices.second.y - vertices.first.y); // skip alpha value by directly computing color increment
-
 		// we got our constants now iterate through whole y values
 		for (int i = vertices.first.y; i <= vertices.second.y; i++)
 		{
@@ -347,11 +346,11 @@ void Scene::lineRasterization(std::pair<Vec3, Vec3> &vertices)
 
 			if (d * movementInImage <= 0)
 			{
-				d += (vertices.first.x - vertices.second.x); // move horizontally only
+				d += (vertices.second.x - vertices.first.x); // move horizontally only
 			}
 			else
 			{ // move diagonally (NE)
-				d += (vertices.first.x - vertices.second.x) + (movementInImage * (vertices.second.y - vertices.first.y));
+				d += (vertices.second.x - vertices.first.x) + (movementInImage * (vertices.first.y - vertices.second.y));
 				x0 += movementInImage;
 			}
 			c0 = colorAddition(c0, colorChange); // interpolate color
