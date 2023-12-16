@@ -319,6 +319,7 @@ void Scene::lineRasterization(std::pair<Vec3, Vec3> &vertices)
 		}
 
 		movementInImage = -1 ? vertices.second.x < vertices.first.x : 1;
+		//movementInImage = vertices.second.x < vertices.first.x ? 0 : 1;
 		depthIncrement = depthChange / std::abs(dy);
 		currentDepth = vertices.first.z;
 
@@ -369,7 +370,7 @@ void Scene::lineRasterization(std::pair<Vec3, Vec3> &vertices)
 		}
 
 		movementInImage = -1 ? vertices.second.y < vertices.first.y : 1;
-
+		//movementInImage = vertices.second.y < vertices.first.y ? -1 : 1;
 		depthIncrement = depthChange / std::abs(dx);
 		currentDepth = vertices.first.z;
 
@@ -603,8 +604,8 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 					Vec4 tempMatrix1 = multiplyMatrixWithVec4(viewingTransformationMatrix, v0.vertex1);
 					Vec3 viewportedVertex0 = Vec3(tempMatrix1.x, tempMatrix1.y, tempMatrix1.z, v0.vertex1.color);
 
-					Vec4 tempMatrix2 = multiplyMatrixWithVec4(viewingTransformationMatrix, v0.vertex1);
-					Vec3 viewportedVertex1 = Vec3(tempMatrix2.x, tempMatrix2.y, tempMatrix2.z, v1.vertex2.color);
+					Vec4 tempMatrix2 = multiplyMatrixWithVec4(viewingTransformationMatrix, v0.vertex2);
+					Vec3 viewportedVertex1 = Vec3(tempMatrix2.x, tempMatrix2.y, tempMatrix2.z, v0.vertex2.color);
 
 					std::pair<Vec3, Vec3> viewportedVertices = std::make_pair(viewportedVertex0, viewportedVertex1);
 
@@ -617,7 +618,7 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 					Vec4 tempMatrix1 = multiplyMatrixWithVec4(viewingTransformationMatrix, v1.vertex1);
 					Vec3 viewportedVertex0 = Vec3(tempMatrix1.x, tempMatrix1.y, tempMatrix1.z, v1.vertex1.color);
 
-					Vec4 tempMatrix2 = multiplyMatrixWithVec4(viewingTransformationMatrix, v1.vertex1);
+					Vec4 tempMatrix2 = multiplyMatrixWithVec4(viewingTransformationMatrix, v1.vertex2);
 					Vec3 viewportedVertex1 = Vec3(tempMatrix2.x, tempMatrix2.y, tempMatrix2.z, v1.vertex2.color);
 
 					std::pair<Vec3, Vec3> viewportedVertices = std::make_pair(viewportedVertex0, viewportedVertex1);
@@ -631,7 +632,7 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 					Vec4 tempMatrix1 = multiplyMatrixWithVec4(viewingTransformationMatrix, v2.vertex1);
 					Vec3 viewportedVertex0 = Vec3(tempMatrix1.x, tempMatrix1.y, tempMatrix1.z, v2.vertex1.color);
 
-					Vec4 tempMatrix2 = multiplyMatrixWithVec4(viewingTransformationMatrix, v2.vertex1);
+					Vec4 tempMatrix2 = multiplyMatrixWithVec4(viewingTransformationMatrix, v2.vertex2);
 					Vec3 viewportedVertex1 = Vec3(tempMatrix2.x, tempMatrix2.y, tempMatrix2.z, v2.vertex2.color);
 
 					std::pair<Vec3, Vec3> viewportedVertices = std::make_pair(viewportedVertex0, viewportedVertex1);
