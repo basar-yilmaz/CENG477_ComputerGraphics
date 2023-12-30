@@ -3,3 +3,5 @@ raytracer
 *.ppm
 *.png
 rasterizer
+*.zip
+main
