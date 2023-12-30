@@ -9,6 +9,7 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 #include <GL/glew.h>
+#include <map>
 // #include <OpenGL/gl3.h>   // The GL Header File
 #include <GLFW/glfw3.h> // The GLFW header
 #include <glm/glm.hpp>	// GL Math library header
@@ -26,6 +27,7 @@ GLint modelingMatrixLoc[2];
 GLint viewingMatrixLoc[2];
 GLint projectionMatrixLoc[2];
 GLint eyePosLoc[2];
+GLuint gTextVBO;
 
 glm::mat4 projectionMatrix;
 glm::mat4 viewingMatrix;
@@ -37,7 +39,27 @@ int activeProgramIndex = 0;
 static float angle = 0;
 static float translateX = 0;
 static float translateY = 0;
-static int jumpFlag = 1; 
+static int jumpFlag = 1;
+
+enum Direction
+{
+	NORMAL = 0,
+	RIGHT = 1,
+	LEFT = 2
+};
+
+/// Holds all state information relevant to a character as loaded using FreeType
+struct Character
+{
+	GLuint TextureID;	// ID handle of the glyph texture
+	glm::ivec2 Size;	// Size of glyph
+	glm::ivec2 Bearing; // Offset from baseline to left/top of glyph
+	GLuint Advance;		// Horizontal offset to advance to next glyph
+};
+
+std::map<GLchar, Character> Characters;
+
+static Direction direction = NORMAL;
 
 struct Vertex
 {
@@ -446,11 +468,11 @@ void init()
 
 void drawModel()
 {
-	// glBindBuffer(GL_ARRAY_BUFFER, gVertexAttribBuffer);
-	// glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gIndexBuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, gVertexAttribBuffer);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gIndexBuffer);
 
-	// glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	// glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataSizeInBytes));
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataSizeInBytes));
 
 	glDrawElements(GL_TRIANGLES, gFaces.size() * 3, GL_UNSIGNED_INT, 0);
 }
@@ -490,9 +512,52 @@ void display()
 	modelingMatrix = matS * initTranslationY * initTranslationZ * matRy; // starting from right side, rotate around Y to turn back, then rotate around Z some more at each frame, then translate.
 
 	// move left and right
-	glm::mat4 left_right_move = glm::translate(glm::mat4(1.0), glm::vec3(translateX, 0.f, 0.f));
+	glm::mat4 moveRightLeft;
+	if (direction == NORMAL)
+	{
+		if (translateX < -1e-2)
+		{
+			translateX += 0.5;
+			moveRightLeft = glm::translate(glm::mat4(1.0), glm::vec3(translateX, 0.f, 0.f));
+			modelingMatrix = moveRightLeft * modelingMatrix;
+		}
+		else if (translateX > 1e-2)
+		{
+			translateX -= 0.5;
+			moveRightLeft = glm::translate(glm::mat4(1.0), glm::vec3(translateX, 0.f, 0.f));
+			modelingMatrix = moveRightLeft * modelingMatrix;
+		}
+	}
+	else if (direction == RIGHT)
+	{
+		translateX += 0.5;
 
-	modelingMatrix = left_right_move * modelingMatrix;
+		if (translateX >= 5)
+		{
+			translateX = 5;
+
+			moveRightLeft = glm::translate(glm::mat4(1.0), glm::vec3(translateX, 0.f, 0.f));
+		}
+		else
+		{
+			moveRightLeft = glm::translate(glm::mat4(1.0), glm::vec3(translateX, 0.f, 0.f));
+		}
+		modelingMatrix = moveRightLeft * modelingMatrix;
+	}
+	else if (direction == LEFT)
+	{
+		translateX -= 0.5;
+		if (translateX <= -5)
+		{
+			translateX = -5;
+			moveRightLeft = glm::translate(glm::mat4(1.0), glm::vec3(translateX, 0.f, 0.f));
+		}
+		else
+		{
+			moveRightLeft = glm::translate(glm::mat4(1.0), glm::vec3(translateX, 0.f, 0.f));
+		}
+		modelingMatrix = moveRightLeft * modelingMatrix;
+	}
 
 	static float jump_multiplier = 0.1f;
 
@@ -521,12 +586,6 @@ void display()
 
 	modelingMatrix = jump * modelingMatrix;
 
-	// You can adjust the value based on how fast you want the object to move
-	// or... (care for the order! first the very bottom one is applied)
-	// modelingMatrix = glm::translate(glm::mat4(1.0), glm::vec3(0.f, 0.f, -3.f));
-	// modelingMatrix = glm::rotate(modelingMatrix, angleRad, glm::vec3(0.0, 0.0, 1.0));
-	// modelingMatrix = glm::rotate<float>(modelingMatrix, (-180. / 180.) * M_PI, glm::vec3(0.0, 1.0, 0.0));
-	// Set the active program and the values of its uniform variables
 	glUseProgram(gProgram[activeProgramIndex]);
 	glUniformMatrix4fv(projectionMatrixLoc[activeProgramIndex], 1, GL_FALSE, glm::value_ptr(projectionMatrix));
 	glUniformMatrix4fv(viewingMatrixLoc[activeProgramIndex], 1, GL_FALSE, glm::value_ptr(viewingMatrix));
@@ -535,7 +594,6 @@ void display()
 
 	// Draw the scene
 	drawModel();
-
 }
 
 void reshape(GLFWwindow *window, int w, int h)
@@ -592,15 +650,39 @@ void keyboard(GLFWwindow *window, int key, int scancode, int action, int mods)
 	}
 	else if (key == GLFW_KEY_A && action == GLFW_PRESS)
 	{
+		switch (direction)
+		{
+		case NORMAL:
+			direction = LEFT;
+			break;
+		case RIGHT:
+			direction = NORMAL;
+			break;
+		default:
+			direction = LEFT;
+			break;
+		}
 		cout << "left" << endl;
 		// Update the translation matrix to move the object left
-		translateX -= 5;
+		// translateX -= 5;
 	}
 	else if (key == GLFW_KEY_D && action == GLFW_PRESS)
 	{
+		switch (direction)
+		{
+		case NORMAL:
+			direction = RIGHT;
+			break;
+		case LEFT:
+			direction = NORMAL;
+			break;
+		default:
+			direction = RIGHT;
+			break;
+		}
 		cout << "right" << endl;
 		// Update the translation matrix to move the object right
-		translateX += 5;
+		// translateX += 5;
 	}
 }
 
