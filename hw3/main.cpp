@@ -23,11 +23,16 @@
 using namespace std;
 
 GLuint gProgram[2];
-GLint gIntensityLoc;
-float gIntensity = 1000;
+// GLint gIntensityLoc;
+// float gIntensity = 1000;
 int gWidth = 1024, gHeight = 800;
 
-int activeProgramIndex = 0;
+#include <vector>
+#include <GL/glew.h>
+
+// int activeProgramIndex = 0;
+#define BUNNY_VERTEX 34817
+#define QUAD_VERTEX 4
 
 static float angle = 0;
 static float translateX = 0;
@@ -79,14 +84,14 @@ struct Face
     GLuint vIndex[3], tIndex[3], nIndex[3];
 };
 
-vector<Vertex> gVertices;
-vector<Texture> gTextures;
-vector<Normal> gNormals;
-vector<Face> gFaces;
+// vector<Vertex> gVertices;
+// vector<Texture> gTextures;
+// vector<Normal> gNormals;
+// vector<Face> gFaces;
+// GLuint gVertexAttribBuffer, gIndexBuffer;
 
-GLuint gVertexAttribBuffer, gTextVBO, gIndexBuffer;
-GLint gInVertexLoc, gInNormalLoc;
-int gVertexDataSizeInBytes, gNormalDataSizeInBytes;
+GLuint gTextVBO;
+// int gVertexDataSizeInBytes, gNormalDataSizeInBytes;
 
 /// Holds all state information relevant to a character as loaded using FreeType
 struct Character
@@ -99,6 +104,144 @@ struct Character
 
 std::map<GLchar, Character> Characters;
 
+class Object;
+bool ParseObj2(const string &fileName, Object &obj);
+bool ReadDataFromFile(const string &fileName, string &data);
+void createVS(GLuint &program, const string &filename);
+void createFS(GLuint &program, const string &filename);
+
+class Object
+{
+
+public:
+    GLuint vertexBuffer;
+    GLuint indexBuffer;
+    GLuint program_id;
+    int gVertexDataSizeInBytes;
+    int gNormalDataSizeInBytes;
+
+    std::string name;
+
+    std::vector<Vertex> vertices;
+    std::vector<Normal> normals;
+    std::vector<Texture> texture;
+    std::vector<Face> faces;
+
+    Object(GLuint programID, string name) : vertexBuffer(0), indexBuffer(0), program_id(programID), name(name) {}
+
+    void initVBO()
+    {
+        glEnableVertexAttribArray(0);
+        glEnableVertexAttribArray(1);
+        assert(glGetError() == GL_NONE);
+
+        gluErrorString(glGetError());
+
+        glGenBuffers(1, &vertexBuffer);
+        glGenBuffers(1, &indexBuffer);
+
+        gluErrorString(glGetError());
+
+        assert(vertexBuffer > 0 && indexBuffer > 0);
+
+        glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+
+        unsigned verticesSize = (this->vertices).size();
+        unsigned normalsSize = (this->normals).size();
+        unsigned facesSize = (this->faces).size();
+
+        gVertexDataSizeInBytes = verticesSize * 3 * sizeof(GLfloat);
+        gNormalDataSizeInBytes = normalsSize * 3 * sizeof(GLfloat);
+        int indexDataSizeInBytes = facesSize * 3 * sizeof(GLuint);
+        GLfloat *vertexData = new GLfloat[verticesSize * 3];
+        GLfloat *normalData = new GLfloat[normalsSize * 3];
+        GLuint *indexData = new GLuint[facesSize * 3];
+
+        float minX = 1e6, maxX = -1e6;
+        float minY = 1e6, maxY = -1e6;
+        float minZ = 1e6, maxZ = -1e6;
+
+        for (int i = 0; i < verticesSize; ++i)
+        {
+            vertexData[3 * i] = (this->vertices)[i].x;
+            vertexData[3 * i + 1] = (this->vertices)[i].y;
+            vertexData[3 * i + 2] = (this->vertices)[i].z;
+
+            minX = std::min(minX, (this->vertices)[i].x);
+            maxX = std::max(maxX, (this->vertices)[i].x);
+            minY = std::min(minY, (this->vertices)[i].y);
+            maxY = std::max(maxY, (this->vertices)[i].y);
+            minZ = std::min(minZ, (this->vertices)[i].z);
+            maxZ = std::max(maxZ, (this->vertices)[i].z);
+        }
+
+        std::cout << "minX = " << minX << std::endl;
+        std::cout << "maxX = " << maxX << std::endl;
+        std::cout << "minY = " << minY << std::endl;
+        std::cout << "maxY = " << maxY << std::endl;
+        std::cout << "minZ = " << minZ << std::endl;
+        std::cout << "maxZ = " << maxZ << std::endl;
+
+        for (int i = 0; i < normalsSize; ++i)
+        {
+            normalData[3 * i] = (this->normals)[i].x;
+            normalData[3 * i + 1] = (this->normals)[i].y;
+            normalData[3 * i + 2] = (this->normals)[i].z;
+        }
+
+        for (int i = 0; i < facesSize; ++i)
+        {
+            indexData[3 * i] = (this->faces)[i].vIndex[0];
+            indexData[3 * i + 1] = (this->faces)[i].vIndex[1];
+            indexData[3 * i + 2] = (this->faces)[i].vIndex[2];
+        }
+
+        glBufferData(GL_ARRAY_BUFFER, gVertexDataSizeInBytes + gNormalDataSizeInBytes, 0, GL_STATIC_DRAW);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, gVertexDataSizeInBytes, vertexData);
+        glBufferSubData(GL_ARRAY_BUFFER, gVertexDataSizeInBytes, gNormalDataSizeInBytes, normalData);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexDataSizeInBytes, indexData, GL_STATIC_DRAW);
+
+        // done copying; can free now
+        delete[] vertexData;
+        delete[] normalData;
+        delete[] indexData;
+
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataSizeInBytes));
+    }
+
+    void initShaders()
+    {
+        gProgram[this->program_id] = glCreateProgram();
+
+        createVS(gProgram[this->program_id], name + "_vert.glsl");
+        createFS(gProgram[this->program_id], name + "_frag.glsl");
+
+        glBindAttribLocation(gProgram[this->program_id], 0, "inVertex"); //
+        glBindAttribLocation(gProgram[this->program_id], 1, "inNormal");
+
+        glLinkProgram(gProgram[this->program_id]);
+        // glUseProgram(gProgram[program_id]);
+    }
+
+    void draw()
+    {
+        glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+
+        // Draw the bunny
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataSizeInBytes));
+
+        glDrawElements(GL_TRIANGLES, faces.size() * 3, GL_UNSIGNED_INT, 0);
+    }
+};
+
+Object bunny(0, "bunny"); // programId = 0
+Object quad(2, "quad");   // programId = 2
+
+/*
 bool ParseObj(const string &fileName)
 {
     fstream myfile;
@@ -193,46 +336,106 @@ bool ParseObj(const string &fileName)
         return false;
     }
 
-    /*
-    for (int i = 0; i < gVertices.size(); ++i)
+    assert(gVertices.size() == gNormals.size());
+
+    return true;
+}
+*/
+bool ParseObj2(const string &fileName, Object &obj)
+{
+    fstream myfile;
+
+    // Open the input
+    myfile.open(fileName.c_str(), std::ios::in);
+
+    if (myfile.is_open())
     {
-        Vector3 n;
+        string curLine;
 
-        for (int j = 0; j < gFaces.size(); ++j)
+        while (getline(myfile, curLine))
         {
-            for (int k = 0; k < 3; ++k)
+            stringstream str(curLine);
+            GLfloat c1, c2, c3;
+            GLuint index[9];
+            string tmp;
+
+            if (curLine.length() >= 2)
             {
-                if (gFaces[j].vIndex[k] == i)
+                if (curLine[0] == '#') // comment
                 {
-                    // face j contains vertex i
-                    Vector3 a(gVertices[gFaces[j].vIndex[0]].x,
-                              gVertices[gFaces[j].vIndex[0]].y,
-                              gVertices[gFaces[j].vIndex[0]].z);
-
-                    Vector3 b(gVertices[gFaces[j].vIndex[1]].x,
-                              gVertices[gFaces[j].vIndex[1]].y,
-                              gVertices[gFaces[j].vIndex[1]].z);
-
-                    Vector3 c(gVertices[gFaces[j].vIndex[2]].x,
-                              gVertices[gFaces[j].vIndex[2]].y,
-                              gVertices[gFaces[j].vIndex[2]].z);
-
-                    Vector3 ab = b - a;
-                    Vector3 ac = c - a;
-                    Vector3 normalFromThisFace = (ab.cross(ac)).getNormalized();
-                    n += normalFromThisFace;
+                    continue;
                 }
+                else if (curLine[0] == 'v')
+                {
+                    if (curLine[1] == 't') // texture
+                    {
+                        str >> tmp; // consume "vt"
+                        str >> c1 >> c2;
+                        obj.texture.push_back(Texture(c1, c2));
+                    }
+                    else if (curLine[1] == 'n') // normal
+                    {
+                        str >> tmp; // consume "vn"
+                        str >> c1 >> c2 >> c3;
+                        obj.normals.push_back(Normal(c1, c2, c3));
+                    }
+                    else // vertex
+                    {
+                        str >> tmp; // consume "v"
+                        str >> c1 >> c2 >> c3;
+                        obj.vertices.push_back(Vertex(c1, c2, c3));
+                    }
+                }
+                else if (curLine[0] == 'f') // face
+                {
+                    str >> tmp; // consume "f"
+                    char c;
+                    int vIndex[3], nIndex[3], tIndex[3];
+                    str >> vIndex[0];
+                    str >> c >> c; // consume "//"
+                    str >> nIndex[0];
+                    str >> vIndex[1];
+                    str >> c >> c; // consume "//"
+                    str >> nIndex[1];
+                    str >> vIndex[2];
+                    str >> c >> c; // consume "//"
+                    str >> nIndex[2];
 
+                    assert(vIndex[0] == nIndex[0] &&
+                           vIndex[1] == nIndex[1] &&
+                           vIndex[2] == nIndex[2]); // a limitation for now
+
+                    // make indices start from 0
+                    for (int c = 0; c < 3; ++c)
+                    {
+                        vIndex[c] -= 1;
+                        nIndex[c] -= 1;
+                        tIndex[c] -= 1;
+                    }
+
+                    obj.faces.push_back(Face(vIndex, tIndex, nIndex));
+                }
+                else
+                {
+                    cout << "Ignoring unidentified line in obj file: " << curLine << endl;
+                }
+            }
+
+            // data += curLine;
+            if (!myfile.eof())
+            {
+                // data += "\n";
             }
         }
 
-        n.normalize();
-
-        gNormals.push_back(Normal(n.x, n.y, n.z));
+        myfile.close();
     }
-    */
+    else
+    {
+        return false;
+    }
 
-    assert(gVertices.size() == gNormals.size());
+    assert(obj.vertices.size() == obj.normals.size());
 
     return true;
 }
@@ -317,45 +520,30 @@ void createFS(GLuint &program, const string &filename)
     glAttachShader(program, fs);
 }
 
-void initShaders()
+void initTextShaders()
 {
-    gProgram[0] = glCreateProgram();
     gProgram[1] = glCreateProgram();
-    // gProgram[2] = glCreateProgram();
-
-    createVS(gProgram[0], "vert0.glsl");
-    createFS(gProgram[0], "frag0.glsl");
-
-    // createVS(gProgram[1], "vert1.glsl");
-    // createFS(gProgram[1], "frag1.glsl");
 
     createVS(gProgram[1], "vert_text.glsl");
     createFS(gProgram[1], "frag_text.glsl");
 
-    glBindAttribLocation(gProgram[0], 0, "inVertex");
-    glBindAttribLocation(gProgram[0], 1, "inNormal");
-    // glBindAttribLocation(gProgram[1], 0, "inVertex");
-    // glBindAttribLocation(gProgram[1], 1, "inNormal");
-    glBindAttribLocation(gProgram[1], 2, "vertex");
+    glBindAttribLocation(gProgram[1], 2, "vertex"); // text
 
-    glLinkProgram(gProgram[0]);
-    // glLinkProgram(gProgram[1]);
     glLinkProgram(gProgram[1]);
-    glUseProgram(gProgram[0]);
-
-    gIntensityLoc = glGetUniformLocation(gProgram[0], "intensity");
-    cout << "gIntensityLoc = " << gIntensityLoc << endl;
-    glUniform1f(gIntensityLoc, gIntensity);
 }
 
-void initVBO()
+/*void initVBO()
 {
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
     assert(glGetError() == GL_NONE);
 
+    gluErrorString(glGetError());
+
     glGenBuffers(1, &gVertexAttribBuffer);
     glGenBuffers(1, &gIndexBuffer);
+
+    gluErrorString(glGetError());
 
     assert(gVertexAttribBuffer > 0 && gIndexBuffer > 0);
 
@@ -387,12 +575,12 @@ void initVBO()
         maxZ = std::max(maxZ, gVertices[i].z);
     }
 
-    std::cout << "minX = " << minX << std::endl;
-    std::cout << "maxX = " << maxX << std::endl;
-    std::cout << "minY = " << minY << std::endl;
-    std::cout << "maxY = " << maxY << std::endl;
-    std::cout << "minZ = " << minZ << std::endl;
-    std::cout << "maxZ = " << maxZ << std::endl;
+    // std::cout << "minX = " << minX << std::endl;
+    // std::cout << "maxX = " << maxX << std::endl;
+    // std::cout << "minY = " << minY << std::endl;
+    // std::cout << "maxY = " << maxY << std::endl;
+    // std::cout << "minZ = " << minZ << std::endl;
+    // std::cout << "maxZ = " << maxZ << std::endl;
 
     for (int i = 0; i < gNormals.size(); ++i)
     {
@@ -420,8 +608,7 @@ void initVBO()
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataSizeInBytes));
-}
-
+}*/
 void initFonts(int windowWidth, int windowHeight)
 {
     // Set OpenGL options
@@ -511,34 +698,49 @@ void initFonts(int windowWidth, int windowHeight)
 
 void init()
 {
-    // ParseObj("armadillo.obj");
-    ParseObj("bunny.obj");
-    // ParseObj("quad.obj");
+
+    ParseObj2("bunny.obj", bunny);
+    ParseObj2("quad.obj", quad);
+    gluErrorString(glGetError());
 
     glEnable(GL_DEPTH_TEST);
-    initShaders();
+
+    initTextShaders();
+    bunny.initShaders();
+    bunny.initVBO();
+
+    quad.initShaders();
+    quad.initVBO();
+
+    cout << quad.name << endl;
+    cout << bunny.name << endl;
+
     initFonts(gWidth, gHeight);
-    initVBO();
 }
 
-void drawModel()
-{
-    glBindBuffer(GL_ARRAY_BUFFER, gVertexAttribBuffer);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gIndexBuffer);
+// void drawModel()
+// {
+//     glBindBuffer(GL_ARRAY_BUFFER, gVertexAttribBuffer);
+//     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gIndexBuffer);
 
-    // Draw the bunny
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataSizeInBytes));
+//     // Draw the bunny
+//     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+//     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataSizeInBytes));
 
-    glDrawElements(GL_TRIANGLES, gFaces.size() * 3, GL_UNSIGNED_INT, 0);
+//     glDrawElements(GL_TRIANGLES, BUNNY_VERTEX * 2 * 3, GL_UNSIGNED_INT, 0);
+// }
 
-    // Draw the quad
-    // Assuming gFacesQuad contains the face information for the quad
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataSizeInBytes));
+// void drawModelQuad()
+// {
+//     glBindBuffer(GL_ARRAY_BUFFER, gVertexAttribBuffer);
+//     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gIndexBuffer);
 
-    glDrawElements(GL_TRIANGLES, gFaces.size() * 3, GL_UNSIGNED_INT, 0);
-}
+//     // Draw the bunny
+//     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+//     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataSizeInBytes));
+
+//     glDrawElements(GL_QUADS, QUAD_VERTEX / 2 * 3, GL_UNSIGNED_INT, BUFFER_OFFSET(BUNNY_VERTEX / 2 * 3 * sizeof(GLuint)));
+// }
 
 void renderText(const std::string &text, GLfloat x, GLfloat y, GLfloat scale, glm::vec3 color)
 {
@@ -596,8 +798,7 @@ void display()
     glClearStencil(0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-    static float angle = 0;
-
+    // BUNNY PART
     glUseProgram(gProgram[0]);
     glLoadIdentity();
 
@@ -691,14 +892,34 @@ void display()
     glUniformMatrix4fv(glGetUniformLocation(gProgram[0], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMat));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[0], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatInv));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[0], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMat));
-    drawModel();
+    bunny.draw();
+
+    // QUAD PART
+    glUseProgram(gProgram[2]);
+    glLoadIdentity();
+
+    glm::mat4 initTranslationY_quad = glm::translate(glm::mat4(1.0), glm::vec3(0.f, 0.f, -25.f));
+    glm::mat4 initTranslationZ_quad = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -0.f, -10.f));
+    glm::mat4 matRy_quad = glm::rotate<float>(glm::mat4(1.0), (-90. / 180.) * M_PI, glm::vec3(0.0, 1.0, 0.0));
+    // glm::mat4 matS = glm::scale(glm::mat4(1.0), glm::vec3(0.5, 0.5, 0.5));
+
+    glm::mat4 modelMatQuad = initTranslationY_quad * matRy_quad;
+
+    glm::mat4 modelMatInvQuad = glm::transpose(glm::inverse(modelMatQuad));
+    glm::mat4 perspMatQuad = glm::perspective(glm::radians(90.0f), 1.f, 1.0f, 50.0f);
+
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMatQuad));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatInvQuad));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMatQuad));
+
+    quad.draw();
 
     score += 1 + jump_multiplier;
     float scaleX = static_cast<float>(gWidth) / 1024;
     float scaleY = static_cast<float>(gHeight) / 800;
-    float scale = 1 * std::min(scaleX, scaleY); 
+    float scale = 1 * std::min(scaleX, scaleY);
 
-
+    // TEXT PART
     std::string scoreString = "Score: " + std::to_string(score);
 
     float textHeight = 48; // Assuming the text height is around 48 pixels
@@ -719,7 +940,7 @@ void reshape(GLFWwindow *window, int w, int h)
 
     glViewport(0, 0, w, h);
     glm::mat4 projection = glm::ortho(0.0f, static_cast<GLfloat>(gWidth), 0.0f, static_cast<GLfloat>(gHeight));
-    glUseProgram(gProgram[1]);
+    glUseProgram(gProgram[0]);
     gluErrorString(glGetError());
     glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 }
@@ -752,7 +973,7 @@ void keyboard(GLFWwindow *window, int key, int scancode, int action, int mods)
             direction = LEFT;
             break;
         }
-        cout << "left" << endl;
+        // cout << "left" << endl;
         // Update the translation matrix to move the object left
         // translateX -= 5;
     }
@@ -770,7 +991,7 @@ void keyboard(GLFWwindow *window, int key, int scancode, int action, int mods)
             direction = RIGHT;
             break;
         }
-        cout << "right" << endl;
+        // cout << "right" << endl;
         // Update the translation matrix to move the object right
         // translateX += 5;
     }
