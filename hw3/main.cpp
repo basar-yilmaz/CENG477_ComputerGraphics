@@ -22,7 +22,7 @@
 
 using namespace std;
 
-GLuint gProgram[2];
+GLuint gProgram[3];
 // GLint gIntensityLoc;
 // float gIntensity = 1000;
 int gWidth = 1024, gHeight = 800;
@@ -133,6 +133,8 @@ public:
     {
         glEnableVertexAttribArray(0);
         glEnableVertexAttribArray(1);
+        // cout << "program_id = " << this->program_id << endl;
+        // cout << "program_name = " << this->name << endl;
         assert(glGetError() == GL_NONE);
 
         gluErrorString(glGetError());
@@ -176,12 +178,12 @@ public:
             maxZ = std::max(maxZ, (this->vertices)[i].z);
         }
 
-        std::cout << "minX = " << minX << std::endl;
-        std::cout << "maxX = " << maxX << std::endl;
-        std::cout << "minY = " << minY << std::endl;
-        std::cout << "maxY = " << maxY << std::endl;
-        std::cout << "minZ = " << minZ << std::endl;
-        std::cout << "maxZ = " << maxZ << std::endl;
+        // std::cout << "minX = " << minX << std::endl;
+        // std::cout << "maxX = " << maxX << std::endl;
+        // std::cout << "minY = " << minY << std::endl;
+        // std::cout << "maxY = " << maxY << std::endl;
+        // std::cout << "minZ = " << minZ << std::endl;
+        // std::cout << "maxZ = " << maxZ << std::endl;
 
         for (int i = 0; i < normalsSize; ++i)
         {
@@ -209,6 +211,10 @@ public:
 
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataSizeInBytes));
+
+        // cout << "program_id = " << this->program_id << endl;
+        // cout << "program_name = " << this->name << endl;
+        // cout << "vertexDatasize = " << gVertexDataSizeInBytes << endl;
     }
 
     void initShaders()
@@ -222,11 +228,17 @@ public:
         glBindAttribLocation(gProgram[this->program_id], 1, "inNormal");
 
         glLinkProgram(gProgram[this->program_id]);
-        // glUseProgram(gProgram[program_id]);
+        glUseProgram(gProgram[program_id]);
+
+        // cout << "shader_program_id = " << this->program_id << endl;
+        // cout << "program_name = " << this->name << endl;
     }
 
     void draw()
     {
+        glUseProgram(gProgram[this->program_id]);
+
+        // cout << "program_id = " << this->program_id << endl;
         glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
 
@@ -235,8 +247,15 @@ public:
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataSizeInBytes));
 
         glDrawElements(GL_TRIANGLES, faces.size() * 3, GL_UNSIGNED_INT, 0);
+        // cout << "program_id = " << this->program_id << endl;
+        // cout << "face size= " << faces.size() << endl;
+        // cout << this->vertices[0].x << endl;
     }
 };
+
+static float quadX = 0;
+static float quadY = 0;
+static float quadZ = 0;
 
 Object bunny(0, "bunny"); // programId = 0
 Object quad(2, "quad");   // programId = 2
@@ -707,9 +726,9 @@ void init()
 
     initTextShaders();
     bunny.initShaders();
-    bunny.initVBO();
-
     quad.initShaders();
+
+    bunny.initVBO();
     quad.initVBO();
 
     cout << quad.name << endl;
@@ -717,30 +736,6 @@ void init()
 
     initFonts(gWidth, gHeight);
 }
-
-// void drawModel()
-// {
-//     glBindBuffer(GL_ARRAY_BUFFER, gVertexAttribBuffer);
-//     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gIndexBuffer);
-
-//     // Draw the bunny
-//     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-//     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataSizeInBytes));
-
-//     glDrawElements(GL_TRIANGLES, BUNNY_VERTEX * 2 * 3, GL_UNSIGNED_INT, 0);
-// }
-
-// void drawModelQuad()
-// {
-//     glBindBuffer(GL_ARRAY_BUFFER, gVertexAttribBuffer);
-//     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gIndexBuffer);
-
-//     // Draw the bunny
-//     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-//     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataSizeInBytes));
-
-//     glDrawElements(GL_QUADS, QUAD_VERTEX / 2 * 3, GL_UNSIGNED_INT, BUFFER_OFFSET(BUNNY_VERTEX / 2 * 3 * sizeof(GLuint)));
-// }
 
 void renderText(const std::string &text, GLfloat x, GLfloat y, GLfloat scale, glm::vec3 color)
 {
@@ -800,7 +795,7 @@ void display()
 
     // BUNNY PART
     glUseProgram(gProgram[0]);
-    glLoadIdentity();
+    // glLoadIdentity();
 
     glm::mat4 initTranslationY = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -6.f, -20.f));
     glm::mat4 initTranslationZ = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -0.f, -10.f));
@@ -889,18 +884,18 @@ void display()
     glm::mat4 modelMatInv = glm::transpose(glm::inverse(modelMat));
     glm::mat4 perspMat = glm::perspective(glm::radians(45.0f), 1.f, 1.0f, 100.0f);
 
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[0], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMat));
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[0], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatInv));
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[0], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMat));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[bunny.program_id], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMat));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[bunny.program_id], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatInv));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[bunny.program_id], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMat));
     bunny.draw();
 
     // QUAD PART
     glUseProgram(gProgram[2]);
-    glLoadIdentity();
+    // glLoadIdentity();
 
-    glm::mat4 initTranslationY_quad = glm::translate(glm::mat4(1.0), glm::vec3(0.f, 0.f, -25.f));
+    glm::mat4 initTranslationY_quad = glm::translate(glm::mat4(1.0), glm::vec3(0.f + quadX, 5.f + quadY, -15.f + quadZ));
     glm::mat4 initTranslationZ_quad = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -0.f, -10.f));
-    glm::mat4 matRy_quad = glm::rotate<float>(glm::mat4(1.0), (-90. / 180.) * M_PI, glm::vec3(0.0, 1.0, 0.0));
+    glm::mat4 matRy_quad = glm::rotate<float>(glm::mat4(1.0), 1, glm::vec3(0.0, 1.0, 0.0));
     // glm::mat4 matS = glm::scale(glm::mat4(1.0), glm::vec3(0.5, 0.5, 0.5));
 
     glm::mat4 modelMatQuad = initTranslationY_quad * matRy_quad;
@@ -908,9 +903,9 @@ void display()
     glm::mat4 modelMatInvQuad = glm::transpose(glm::inverse(modelMatQuad));
     glm::mat4 perspMatQuad = glm::perspective(glm::radians(90.0f), 1.f, 1.0f, 50.0f);
 
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMatQuad));
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatInvQuad));
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMatQuad));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[quad.program_id], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMatQuad));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[quad.program_id], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatInvQuad));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[quad.program_id], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMatQuad));
 
     quad.draw();
 
@@ -951,14 +946,6 @@ void keyboard(GLFWwindow *window, int key, int scancode, int action, int mods)
     {
         glfwSetWindowShouldClose(window, GL_TRUE);
     }
-    // else if (key == GLFW_KEY_B && action == GLFW_PRESS)
-    // {
-    //     cout << "B pressed" << endl;
-    //     gIntensity *= 1.5;
-    //     cout << "gIntensity = " << gIntensity << endl;
-    //     glUseProgram(gProgram[0]);
-    //     glUniform1f(gIntensityLoc, gIntensity);
-    // }
     else if (key == GLFW_KEY_A && action == GLFW_PRESS)
     {
         switch (direction)
@@ -994,6 +981,36 @@ void keyboard(GLFWwindow *window, int key, int scancode, int action, int mods)
         // cout << "right" << endl;
         // Update the translation matrix to move the object right
         // translateX += 5;
+    }
+    else if (key == GLFW_KEY_X && action == GLFW_PRESS)
+    {
+        quadX += 1;
+        cout << "quadX = " << quadX << endl;
+    }
+    else if (key == GLFW_KEY_3 && action == GLFW_PRESS)
+    {
+        quadX -= 1;
+        cout << "quadX = " << quadX << endl;
+    }
+    else if (key == GLFW_KEY_Y && action == GLFW_PRESS)
+    {
+        quadY += 1;
+        cout << "quadY = " << quadY << endl;
+    }
+    else if (key == GLFW_KEY_4 && action == GLFW_PRESS)
+    {
+        quadY -= 1;
+        cout << "quadY = " << quadY << endl;
+    }
+    else if (key == GLFW_KEY_Z && action == GLFW_PRESS)
+    {
+        quadZ += 1;
+        cout << "quadZ = " << quadZ << endl;
+    }
+    else if (key == GLFW_KEY_5 && action == GLFW_PRESS)
+    {
+        quadZ -= 1;
+        cout << "quadZ = " << quadZ << endl;
     }
 }
 

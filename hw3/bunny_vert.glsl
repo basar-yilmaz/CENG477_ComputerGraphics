@@ -1,14 +1,14 @@
-#version 120 
+#version 330 core
 
-attribute vec3 inVertex;
-attribute vec3 inNormal;
+layout(location = 0) in vec3 inVertex;   // Vertex attribute
+layout(location = 1) in vec3 inNormal;   // Normal attribute
 
 uniform mat4 modelingMat;
 uniform mat4 modelingMatInvTr;
 uniform mat4 perspectiveMat;
 
-varying vec4 fragPos;
-varying vec3 N;
+out vec4 fragPos;
+out vec3 N;
 
 void main(void)
 {
