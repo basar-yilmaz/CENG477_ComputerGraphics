@@ -22,7 +22,7 @@
 
 using namespace std;
 
-GLuint gProgram[3];
+GLuint gProgram[2];
 GLint gIntensityLoc;
 float gIntensity = 1000;
 int gWidth = 1024, gHeight = 800;
@@ -321,26 +321,26 @@ void initShaders()
 {
     gProgram[0] = glCreateProgram();
     gProgram[1] = glCreateProgram();
-    gProgram[2] = glCreateProgram();
+    // gProgram[2] = glCreateProgram();
 
     createVS(gProgram[0], "vert0.glsl");
     createFS(gProgram[0], "frag0.glsl");
 
-    createVS(gProgram[1], "vert1.glsl");
-    createFS(gProgram[1], "frag1.glsl");
+    // createVS(gProgram[1], "vert1.glsl");
+    // createFS(gProgram[1], "frag1.glsl");
 
-    createVS(gProgram[2], "vert_text.glsl");
-    createFS(gProgram[2], "frag_text.glsl");
+    createVS(gProgram[1], "vert_text.glsl");
+    createFS(gProgram[1], "frag_text.glsl");
 
     glBindAttribLocation(gProgram[0], 0, "inVertex");
     glBindAttribLocation(gProgram[0], 1, "inNormal");
-    glBindAttribLocation(gProgram[1], 0, "inVertex");
-    glBindAttribLocation(gProgram[1], 1, "inNormal");
-    glBindAttribLocation(gProgram[2], 2, "vertex");
+    // glBindAttribLocation(gProgram[1], 0, "inVertex");
+    // glBindAttribLocation(gProgram[1], 1, "inNormal");
+    glBindAttribLocation(gProgram[1], 2, "vertex");
 
     glLinkProgram(gProgram[0]);
+    // glLinkProgram(gProgram[1]);
     glLinkProgram(gProgram[1]);
-    glLinkProgram(gProgram[2]);
     glUseProgram(gProgram[0]);
 
     gIntensityLoc = glGetUniformLocation(gProgram[0], "intensity");
@@ -430,8 +430,8 @@ void initFonts(int windowWidth, int windowHeight)
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     glm::mat4 projection = glm::ortho(0.0f, static_cast<GLfloat>(windowWidth), 0.0f, static_cast<GLfloat>(windowHeight));
-    glUseProgram(gProgram[2]);
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+    glUseProgram(gProgram[1]);
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[1], "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
     // FreeType
     FT_Library ft;
@@ -513,7 +513,7 @@ void init()
 {
     // ParseObj("armadillo.obj");
     ParseObj("bunny.obj");
-    ParseObj("quad.obj");
+    // ParseObj("quad.obj");
 
     glEnable(GL_DEPTH_TEST);
     initShaders();
@@ -543,8 +543,8 @@ void drawModel()
 void renderText(const std::string &text, GLfloat x, GLfloat y, GLfloat scale, glm::vec3 color)
 {
     // Activate corresponding render state
-    glUseProgram(gProgram[2]);
-    glUniform3f(glGetUniformLocation(gProgram[2], "textColor"), color.x, color.y, color.z);
+    glUseProgram(gProgram[1]);
+    glUniform3f(glGetUniformLocation(gProgram[1], "textColor"), color.x, color.y, color.z);
     glActiveTexture(GL_TEXTURE0);
 
     // Iterate through all characters
@@ -704,7 +704,7 @@ void display()
     float textHeight = 48; // Assuming the text height is around 48 pixels
     renderText(scoreString, 10, gHeight - textHeight - 10, scale, glm::vec3(0, 1, 1));
 
-    assert(glGetError() == GL_NO_ERROR);
+    // assert(glGetError() == GL_NO_ERROR);
 
     gluErrorString(glGetError());
 }
@@ -719,7 +719,8 @@ void reshape(GLFWwindow *window, int w, int h)
 
     glViewport(0, 0, w, h);
     glm::mat4 projection = glm::ortho(0.0f, static_cast<GLfloat>(gWidth), 0.0f, static_cast<GLfloat>(gHeight));
-    glUseProgram(gProgram[2]);
+    glUseProgram(gProgram[1]);
+    gluErrorString(glGetError());
     glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 }
 
@@ -729,24 +730,14 @@ void keyboard(GLFWwindow *window, int key, int scancode, int action, int mods)
     {
         glfwSetWindowShouldClose(window, GL_TRUE);
     }
-    else if (key == GLFW_KEY_F && action == GLFW_PRESS)
-    {
-        cout << "F pressed" << endl;
-        glUseProgram(gProgram[1]);
-    }
-    else if (key == GLFW_KEY_V && action == GLFW_PRESS)
-    {
-        cout << "V pressed" << endl;
-        glUseProgram(gProgram[0]);
-    }
-    else if (key == GLFW_KEY_B && action == GLFW_PRESS)
-    {
-        cout << "B pressed" << endl;
-        gIntensity *= 1.5;
-        cout << "gIntensity = " << gIntensity << endl;
-        glUseProgram(gProgram[0]);
-        glUniform1f(gIntensityLoc, gIntensity);
-    }
+    // else if (key == GLFW_KEY_B && action == GLFW_PRESS)
+    // {
+    //     cout << "B pressed" << endl;
+    //     gIntensity *= 1.5;
+    //     cout << "gIntensity = " << gIntensity << endl;
+    //     glUseProgram(gProgram[0]);
+    //     glUniform1f(gIntensityLoc, gIntensity);
+    // }
     else if (key == GLFW_KEY_A && action == GLFW_PRESS)
     {
         switch (direction)
