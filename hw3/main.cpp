@@ -793,11 +793,37 @@ void display()
     glClearStencil(0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
+    // QUAD PART
+    glUseProgram(gProgram[2]);
+    // glLoadIdentity();
+
+    glm::mat4 initTranslationY_quad = glm::translate(glm::mat4(1.0), glm::vec3(0.f + quadX, -5.f + quadY, -10.f + quadZ));
+    glm::mat4 initTranslationZ_quad = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -0.f, -10.f));
+    glm::mat4 matRy_quad = glm::rotate<float>(glm::mat4(1.0), (-45. / 180.) * M_PI, glm::vec3(1.0, 0.0, 0.0));
+    // glm::mat4 matS = glm::scale(glm::mat4(1.0), glm::vec3(0.5, 0.5, 0.5));
+    // ... (previous code)
+
+    glm::mat4 modelMatQuad = initTranslationY_quad * matRy_quad;
+    glm::mat4 modelMatInvQuad = glm::transpose(glm::inverse(modelMatQuad));
+
+    // Set a large value for the far clipping plane
+
+    glm::mat4 perspMatQuad = glm::perspective(glm::radians(90.0f), GLfloat(gWidth / gHeight), 0.1f, 200.f);
+
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[quad.program_id], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMatQuad));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[quad.program_id], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatInvQuad));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[quad.program_id], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMatQuad));
+
+    glm::vec3 newEyePos = glm::vec3(5, 0, 0); // Replace newX, newY, and newZ with your desired eye position
+    glUniform3fv(glGetUniformLocation(gProgram[quad.program_id], "eyePos"), 1, glm::value_ptr(newEyePos));
+
+    quad.draw();
+
     // BUNNY PART
     glUseProgram(gProgram[0]);
     // glLoadIdentity();
 
-    glm::mat4 initTranslationY = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -6.f, -20.f));
+    glm::mat4 initTranslationY = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -6.f, -10.f));
     glm::mat4 initTranslationZ = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -0.f, -10.f));
     glm::mat4 matRy = glm::rotate<float>(glm::mat4(1.0), (-90. / 180.) * M_PI, glm::vec3(0.0, 1.0, 0.0));
     glm::mat4 matS = glm::scale(glm::mat4(1.0), glm::vec3(0.5, 0.5, 0.5));
@@ -882,32 +908,12 @@ void display()
     modelMat = jump * modelMat;
 
     glm::mat4 modelMatInv = glm::transpose(glm::inverse(modelMat));
-    glm::mat4 perspMat = glm::perspective(glm::radians(45.0f), 1.f, 1.0f, 100.0f);
+    glm::mat4 perspMat = glm::perspective(glm::radians(90.0f), GLfloat(gWidth / gHeight), 0.1f, 200.f);
 
     glUniformMatrix4fv(glGetUniformLocation(gProgram[bunny.program_id], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMat));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[bunny.program_id], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatInv));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[bunny.program_id], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMat));
     bunny.draw();
-
-    // QUAD PART
-    glUseProgram(gProgram[2]);
-    // glLoadIdentity();
-
-    glm::mat4 initTranslationY_quad = glm::translate(glm::mat4(1.0), glm::vec3(0.f + quadX, 5.f + quadY, -15.f + quadZ));
-    glm::mat4 initTranslationZ_quad = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -0.f, -10.f));
-    glm::mat4 matRy_quad = glm::rotate<float>(glm::mat4(1.0), 1, glm::vec3(0.0, 1.0, 0.0));
-    // glm::mat4 matS = glm::scale(glm::mat4(1.0), glm::vec3(0.5, 0.5, 0.5));
-
-    glm::mat4 modelMatQuad = initTranslationY_quad * matRy_quad;
-
-    glm::mat4 modelMatInvQuad = glm::transpose(glm::inverse(modelMatQuad));
-    glm::mat4 perspMatQuad = glm::perspective(glm::radians(90.0f), 1.f, 1.0f, 50.0f);
-
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[quad.program_id], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMatQuad));
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[quad.program_id], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatInvQuad));
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[quad.program_id], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMatQuad));
-
-    quad.draw();
 
     score += 1 + jump_multiplier;
     float scaleX = static_cast<float>(gWidth) / 1024;
