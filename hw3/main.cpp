@@ -443,7 +443,7 @@ void initFonts(int windowWidth, int windowHeight)
 
     // Load font as face
     FT_Face face;
-    if (FT_New_Face(ft, "/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf", 0, &face))
+    if (FT_New_Face(ft, "/usr/share/fonts/truetype/ubuntu/Ubuntu-M.ttf", 0, &face))
     {
         std::cout << "ERROR::FREETYPE: Failed to load font" << std::endl;
     }
@@ -694,10 +694,15 @@ void display()
     drawModel();
 
     score += 1 + jump_multiplier;
+    float scaleX = static_cast<float>(gWidth) / 1024;
+    float scaleY = static_cast<float>(gHeight) / 800;
+    float scale = 1 * std::min(scaleX, scaleY); 
+
 
     std::string scoreString = "Score: " + std::to_string(score);
 
-    renderText(scoreString, 0, 0, 1, glm::vec3(0, 1, 1));
+    float textHeight = 48; // Assuming the text height is around 48 pixels
+    renderText(scoreString, 10, gHeight - textHeight - 10, scale, glm::vec3(0, 1, 1));
 
     assert(glGetError() == GL_NO_ERROR);
 
@@ -713,6 +718,9 @@ void reshape(GLFWwindow *window, int w, int h)
     gHeight = h;
 
     glViewport(0, 0, w, h);
+    glm::mat4 projection = glm::ortho(0.0f, static_cast<GLfloat>(gWidth), 0.0f, static_cast<GLfloat>(gHeight));
+    glUseProgram(gProgram[2]);
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 }
 
 void keyboard(GLFWwindow *window, int key, int scancode, int action, int mods)
