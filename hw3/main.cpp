@@ -791,6 +791,8 @@ void renderText(const std::string &text, GLfloat x, GLfloat y, GLfloat scale, gl
 #define MAX_MOVE 7
 #define BUNNY_SCALE 1.25
 
+static float quadYMulti = 1.f;
+static float quadZMulti = 1.f;
 void display()
 {
     glClearColor(0, 0, 0, 1);
@@ -803,8 +805,8 @@ void display()
     // glLoadIdentity();
     float scaleFrag = 0.1f; // Adjust this to control the size of the checker squares
     glUniform1f(glGetUniformLocation(gProgram[quad.program_id], "scale"), scaleFrag);
-    glm::vec3 color1 = glm::vec3(0.0, 0.0, 0.0); // Black
-    glm::vec3 color2 = glm::vec3(1.0, 1.0, 1.0); // White
+    glm::vec3 color1 = glm::vec3(0.0, 1.0, 1.0); // Black
+    glm::vec3 color2 = glm::vec3(1.0, 0.5, 1.0); // White
     glUniform3fv(glGetUniformLocation(gProgram[quad.program_id], "color1"), 1, glm::value_ptr(color1));
     glUniform3fv(glGetUniformLocation(gProgram[quad.program_id], "color2"), 1, glm::value_ptr(color2));
 
@@ -815,22 +817,21 @@ void display()
     // ... (previous code)
 
     // -z translation
-    glm::mat4 movingQuad = glm::translate(glm::mat4(1.0), glm::vec3(quadX, quadY, quadZ));
+    glm::mat4 movingQuad = glm::translate(glm::mat4(1.0), glm::vec3(0, quadY * quadYMulti, quadZ * quadZMulti));
 
     glm::mat4 modelMatQuad = movingQuad * initTranslationY_quad * matRy_quad * matS_quad;
+    glm::mat4 viewMatrixQuad = glm::translate(glm::mat4(1.0), glm::vec3(0, -quadY, -quadZ));
 
     glm::mat4 modelMatInvQuad = glm::transpose(glm::inverse(modelMatQuad));
 
     // Set a large value for the far clipping plane
 
-    glm::mat4 perspMatQuad = glm::perspective(glm::radians(120.0f), GLfloat(gWidth / gHeight), 0.1f, 2000.0f);
+    glm::mat4 perspMatQuad = glm::perspective(glm::radians(120.0f), GLfloat(gWidth / gHeight), 0.1f, 20000.0f);
 
     glUniformMatrix4fv(glGetUniformLocation(gProgram[quad.program_id], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMatQuad));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[quad.program_id], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatInvQuad));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[quad.program_id], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMatQuad));
-
-    // glm::vec3 newEyePos = glm::vec3(5, 0, 0); // Replace newX, newY, and newZ with your desired eye position
-    // glUniform3fv(glGetUniformLocation(gProgram[quad.program_id], "eyePos"), 1, glm::value_ptr(newEyePos));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[quad.program_id], "viewingMat"), 1, GL_FALSE, glm::value_ptr(viewMatrixQuad));
 
     quad.draw();
 
@@ -921,6 +922,8 @@ void display()
     jump_multiplier += 0.0002f;
 
     modelMat = jump * modelMat;
+    modelMat = glm::translate(glm::mat4(1.0), glm::vec3(0, quadY * quadYMulti, quadZ * quadZMulti)) * modelMat;
+    glm::mat4 viewMatrix = glm::translate(glm::mat4(1.0), glm::vec3(0, -quadY * quadYMulti, -quadZ * quadZMulti));
 
     glm::mat4 modelMatInv = glm::transpose(glm::inverse(modelMat));
     glm::mat4 perspMat = glm::perspective(glm::radians(90.0f), GLfloat(gWidth / gHeight), 0.1f, 200.f);
@@ -928,7 +931,12 @@ void display()
     glUniformMatrix4fv(glGetUniformLocation(gProgram[bunny.program_id], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMat));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[bunny.program_id], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatInv));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[bunny.program_id], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMat));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[bunny.program_id], "viewingMat"), 1, GL_FALSE, glm::value_ptr(viewMatrix));
     bunny.draw();
+    quadZ -= 0.2;
+    quadY -= 0.2;
+    // quadZMulti += 0.1f;
+    // quadYMulti += 0.1f;
 
     score += 1 + jump_multiplier;
     float scaleX = static_cast<float>(gWidth) / 1024;
@@ -1005,22 +1013,22 @@ void keyboard(GLFWwindow *window, int key, int scancode, int action, int mods)
     }
     else if (key == GLFW_KEY_X && action == GLFW_PRESS)
     {
-        quadX += 1;
+        quadX += 0.1;
         cout << "quadX = " << quadX << endl;
     }
     else if (key == GLFW_KEY_3 && action == GLFW_PRESS)
     {
-        quadX -= 1;
+        quadX -= 0.1;
         cout << "quadX = " << quadX << endl;
     }
     else if (key == GLFW_KEY_Y && action == GLFW_PRESS)
     {
-        quadY += 1;
+        quadY += 0.1;
         cout << "quadY = " << quadY << endl;
     }
     else if (key == GLFW_KEY_4 && action == GLFW_PRESS)
     {
-        quadY -= 1;
+        quadY -= 0.1;
         cout << "quadY = " << quadY << endl;
     }
     else if (key == GLFW_KEY_Z && action == GLFW_PRESS)

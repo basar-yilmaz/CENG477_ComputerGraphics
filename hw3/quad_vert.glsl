@@ -6,6 +6,7 @@ layout(location = 1) in vec3 inNormal;   // Normal attribute
 uniform mat4 modelingMat;
 uniform mat4 modelingMatInvTr;
 uniform mat4 perspectiveMat;
+uniform mat4 viewingMat;
 
 out vec4 fragPos;
 out vec3 N;
@@ -19,5 +20,7 @@ void main(void)
 	N = normalize(Nw);
 	fragPos = p;
 
-    gl_Position = perspectiveMat * modelingMat * vec4(inVertex, 1);
+	mat4 MVP = perspectiveMat * viewingMat * modelingMat;
+
+    gl_Position = MVP *  vec4(inVertex, 1);
 }

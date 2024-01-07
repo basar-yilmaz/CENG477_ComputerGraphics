@@ -1,7 +1,7 @@
 #version 120
 
 vec3 lightPos = vec3(-5, 5, -5);
-vec3 eyePos = vec3(0, 0, 0);
+vec3 eyePos = vec3(-10, 0, 0);
 
 vec3 I = vec3(0.8, 0.8, 0.1);
 vec3 Iamb = vec3(0.8, 0.8, 0.8);
