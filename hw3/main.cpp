@@ -15,7 +15,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <ft2build.h>
-#include <ctime>    
+#include <ctime>
 #include FT_FREETYPE_H
 #include <string>
 
@@ -30,10 +30,6 @@ int gWidth = 1024, gHeight = 800;
 
 #include <vector>
 #include <GL/glew.h>
-
-// int activeProgramIndex = 0;
-#define BUNNY_VERTEX 34817
-#define QUAD_VERTEX 4
 
 static float angle = 0;
 static float translateX = 0;
@@ -121,6 +117,10 @@ public:
     int gVertexDataSizeInBytes;
     int gNormalDataSizeInBytes;
 
+    int min_X, max_X;
+    int min_Y, max_Y;
+    int min_Z, max_Z;
+
     std::string name;
 
     std::vector<Vertex> vertices;
@@ -185,6 +185,13 @@ public:
         // std::cout << "maxY = " << maxY << std::endl;
         // std::cout << "minZ = " << minZ << std::endl;
         // std::cout << "maxZ = " << maxZ << std::endl;
+
+        this->min_X = minX;
+        this->max_X = maxX;
+        this->min_Y = minY;
+        this->max_Y = maxY;
+        this->min_Z = minZ;
+        this->max_Z = maxZ;
 
         for (int i = 0; i < normalsSize; ++i)
         {
@@ -254,10 +261,6 @@ public:
         glDrawElements(GL_TRIANGLES, faces.size() * 3, GL_UNSIGNED_INT, 0);
     }
 };
-
-static float quadX = 0;
-static float quadY = 0;
-static float quadZ = 0;
 
 Object bunny(0, "bunny"); // programId = 0
 Object quad(2, "quad");   // programId = 2
@@ -754,6 +757,10 @@ int generateAndPrintRandomFloats()
         randomFloats[i] = static_cast<float>(std::rand()) / RAND_MAX;
     }
 
+    // std::cout << randomFloats[0] << endl;
+    // std::cout << randomFloats[1] << endl;
+    // std::cout << randomFloats[2] << endl;
+
     // Find the index of the smallest value
     int smallestIndex = findIndexOfSmallest(randomFloats);
 
@@ -767,9 +774,21 @@ static glm::vec3 RED = glm::vec3(0.8, 0.1, 0.1);
 static glm::vec3 YELLOW = glm::vec3(0.8, 0.8, 0.1);
 static int yellow_index = 0;
 
+static float quadX = 0;
+static float quadY = 0;
+static float quadZ = 0;
+
 static float cubeX = 0;
 static float cubeY = 0;
 static float cubeZ = 0;
+
+bool checkBoundingBoxIntersection(const glm::vec3 &minA, const glm::vec3 &maxA, const glm::vec3 &minB, const glm::vec3 &maxB)
+{
+    return (minA.x <= maxB.x && maxA.x >= minB.x) &&
+           (minA.y <= maxB.y && maxA.y >= minB.y) &&
+           (minA.z <= maxB.z && maxA.z >= minB.z);
+}
+
 void display()
 {
     glClearColor(0, 0, 0, 1);
@@ -780,27 +799,38 @@ void display()
     // QUAD PART
     glUseProgram(gProgram[quad.program_id]);
 
-    float scaleFrag = 0.1f; // Adjust this to control the size of the checker squares
+    float scaleFrag = 0.2f; // Adjust this to control the size of the checker squares
     glUniform1f(glGetUniformLocation(gProgram[quad.program_id], "scale"), scaleFrag);
-    glm::vec3 color1_quad = glm::vec3(0.0, 1.0, 1.0); // Black
-    glm::vec3 color2_quad = glm::vec3(1.0, 0.5, 1.0); // White
+    glm::vec3 color1_quad = glm::vec3(0.0, 0, 0.0);   // Black
+    glm::vec3 color2_quad = glm::vec3(1.0, 1.f, 1.0); // White
     glUniform3fv(glGetUniformLocation(gProgram[quad.program_id], "color1"), 1, glm::value_ptr(color1_quad));
     glUniform3fv(glGetUniformLocation(gProgram[quad.program_id], "color2"), 1, glm::value_ptr(color2_quad));
 
-    glm::mat4 initTranslationY_quad = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -7.f, -10.f));
-    glm::mat4 initTranslationZ_quad = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -0.f, -10.f));
-    glm::mat4 matRy_quad = glm::rotate<float>(glm::mat4(1.0), (-45. / 180.) * M_PI, glm::vec3(1.0, 0.0, 0.0));
-    glm::mat4 matS_quad = glm::scale(glm::mat4(1.0), glm::vec3(20, 100, 1.0f));
+    // glm::mat4 initTranslationY_quad = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -7.f, -10.f));
+    // glm::mat4 initTranslationZ_quad = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -0.f, -10.f));
+    // glm::mat4 matRy_quad = glm::rotate<float>(glm::mat4(1.0), (-45. / 180.) * M_PI, glm::vec3(1.0, 0.0, 0.0));
+    // glm::mat4 matS_quad = glm::scale(glm::mat4(1.0), glm::vec3(100.f, 10.f, 100.0f));
 
     // -z translation
-    glm::mat4 movingQuad = glm::translate(glm::mat4(1.0), glm::vec3(0, quadY, quadZ));
+    // glm::mat4 movingQuad = glm::translate(glm::mat4(1.0), glm::vec3(0, quadY, quadZ));
 
-    glm::mat4 modelMatQuad = movingQuad * initTranslationY_quad * matRy_quad * matS_quad;
-    glm::mat4 viewMatrixQuad = glm::translate(glm::mat4(1.0), glm::vec3(0, -quadY, -quadZ));
+    // glm::mat4 modelMatQuad = movingQuad * initTranslationY_quad * matRy_quad * matS_quad;
+
+    // glm::mat4 viewMatrixQuad = glm::translate(glm::mat4(1.0), glm::vec3(0, -quadY, -quadZ));
+
+    glm::mat4 tTranslate = glm::translate(glm::mat4(1.0), glm::vec3(0.f, 0.f, -10.f));
+
+    glm::mat4 tRotate = glm::rotate<float>(glm::mat4(1.0), glm::radians(-90.f), glm::vec3(1.0, 0.0, 0.f));
+    glm::mat4 zScale = glm::scale(glm::mat4(1.0), glm::vec3(10.f, 100.f, 1.0f));
+
+    glm::mat4 movingQuad = glm::translate(glm::mat4(1.0), glm::vec3(0, 0, quadZ));
+    glm::mat4 modelMatQuad = movingQuad * tTranslate * tRotate * zScale;
+
+    glm::mat4 viewMatrixQuad = glm::translate(glm::mat4(1.0), glm::vec3(0, -5, -quadZ));
 
     glm::mat4 modelMatInvQuad = glm::transpose(glm::inverse(modelMatQuad));
 
-    glm::mat4 perspMatQuad = glm::perspective(glm::radians(120.0f), GLfloat(gWidth / gHeight), 0.1f, 20000.0f);
+    glm::mat4 perspMatQuad = glm::perspective(glm::radians(90.0f), GLfloat(gWidth / gHeight), 0.1f, 200.0f);
 
     glUniformMatrix4fv(glGetUniformLocation(gProgram[quad.program_id], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMatQuad));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[quad.program_id], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatInvQuad));
@@ -814,7 +844,6 @@ void display()
     // glLoadIdentity();
 
     glm::mat4 initTranslationY = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -6.f, -10.f));
-    glm::mat4 initTranslationZ = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -0.f, -10.f));
     glm::mat4 matRy = glm::rotate<float>(glm::mat4(1.0), (-90. / 180.) * M_PI, glm::vec3(0.0, 1.0, 0.0));
     glm::mat4 matS = glm::scale(glm::mat4(1.0), glm::vec3(BUNNY_SCALE, BUNNY_SCALE, BUNNY_SCALE));
 
@@ -896,8 +925,8 @@ void display()
     jump_multiplier += 0.0002f;
 
     modelMat = jump * modelMat;
-    modelMat = glm::translate(glm::mat4(1.0), glm::vec3(0, quadY, quadZ)) * modelMat;
-    glm::mat4 viewMatrix = glm::translate(glm::mat4(1.0), glm::vec3(0, -quadY, -quadZ));
+    modelMat = glm::translate(glm::mat4(1.0), glm::vec3(0, 0, quadZ)) * modelMat;
+    glm::mat4 viewMatrix = glm::translate(glm::mat4(1.0), glm::vec3(0, 0, -quadZ));
 
     glm::mat4 modelMatInv = glm::transpose(glm::inverse(modelMat));
     glm::mat4 perspMat = glm::perspective(glm::radians(90.0f), GLfloat(gWidth / gHeight), 0.1f, 200.f);
@@ -907,28 +936,20 @@ void display()
     glUniformMatrix4fv(glGetUniformLocation(gProgram[bunny.program_id], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMat));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[bunny.program_id], "viewingMat"), 1, GL_FALSE, glm::value_ptr(viewMatrix));
     bunny.draw();
-    quadZ -= 0.2;
-    quadY -= 0.2;
-
 
     // CUBE PART
 
     glUseProgram(gProgram[cube1.program_id]);
 
-    glm::mat4 cubeTranslate = glm::translate(glm::mat4(1.0), glm::vec3(0.f, 20.f, -38.5));
+    glm::mat4 cubeTranslate = glm::translate(glm::mat4(1.0), glm::vec3(0.f, 0.f, -100.f));
     glm::mat4 matRyCube1 = glm::rotate<float>(glm::mat4(1.0), (-90. / 180.) * M_PI, glm::vec3(0.0, 1.0, 0.0));
-    glm::mat4 matSCube1 = glm::scale(glm::mat4(1.0), glm::vec3(1.f, 2.f, 1.f));
+    glm::mat4 matSCube1 = glm::scale(glm::mat4(1.0), glm::vec3(1.f, 3.f, 1.f));
 
-    glm::mat4 cubeMove1 = glm::translate(glm::mat4(1.0), glm::vec3(0.f, quadY, quadZ));
+    glm::mat4 tempMove1 = glm::translate(glm::mat4(1.0), glm::vec3(0, 0, cubeZ));
 
-    glm::mat4 tempMove1 = glm::translate(glm::mat4(1.0), glm::vec3(0, cubeY, cubeZ));
+    glm::mat4 modelMatCube1 = tempMove1 * cubeTranslate * matRyCube1 * matSCube1;
 
-    glm::mat4 rotationOffset = glm::rotate<float>(glm::mat4(1.0), glm::radians(18.0f), glm::vec3(1.0, 0.0, 0.0));
-
-    glm::mat4 modelMatCube1 = tempMove1 * cubeMove1 * cubeTranslate * rotationOffset * matRyCube1 * matSCube1;
-
-    glm::mat4 viewMatrixCube1 = glm::translate(glm::mat4(1.0), glm::vec3(0, -quadY, -quadZ));
-
+    glm::mat4 viewMatrixCube1 = glm::translate(glm::mat4(1.0), glm::vec3(0, -5, cubeZ));
     glm::mat4 modelMatCube1Inv = glm::transpose(glm::inverse(modelMatCube1));
     glm::mat4 perspMatCube1 = glm::perspective(glm::radians(90.0f), GLfloat(gWidth / gHeight), 0.1f, 200.f);
 
@@ -962,19 +983,12 @@ void display()
         color2 = RED;
     }
 
-    glm::mat4 cubeTranslate2 = glm::translate(glm::mat4(1.0), glm::vec3(5.f, 20.f, -38.5));
-    glm::mat4 matRyCube2 = glm::rotate<float>(glm::mat4(1.0), (-90. / 180.) * M_PI, glm::vec3(0.0, 1.0, 0.0));
-    glm::mat4 matSCube2 = glm::scale(glm::mat4(1.0), glm::vec3(1.f, 2.f, 1.f));
+    glm::mat4 cubeTranslate2 = glm::translate(glm::mat4(1.0), glm::vec3(10.f, 0.f, -100.f));
 
-    glm::mat4 cubeMove2 = glm::translate(glm::mat4(1.0), glm::vec3(0.f, quadY, quadZ));
+    glm::mat4 modelMatCube2 = tempMove1 * cubeTranslate2 * matRyCube1 * matSCube1;
 
-    glm::mat4 tempMove2 = glm::translate(glm::mat4(1.0), glm::vec3(0, cubeY, cubeZ));
-
-    glm::mat4 modelMatCube2 = tempMove2 * cubeMove2 * cubeTranslate2 * rotationOffset * matRyCube2 * matSCube2;
-
-    glm::mat4 viewMatrixCube2 = glm::translate(glm::mat4(1.0), glm::vec3(cubeX, -quadY, -quadZ));
-
-    glm::mat4 modelMatCube2Inv = glm::transpose(glm::inverse(modelMatCube2));
+    glm::mat4 viewMatrixCube2 = glm::translate(glm::mat4(1.0), glm::vec3(0, -5, cubeZ));
+    glm::mat4 modelMatCube2Inv = glm::transpose(glm::inverse(modelMatCube1));
     glm::mat4 perspMatCube2 = glm::perspective(glm::radians(90.0f), GLfloat(gWidth / gHeight), 0.1f, 200.f);
 
     glUniformMatrix4fv(glGetUniformLocation(gProgram[cube2.program_id], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMatCube2));
@@ -996,19 +1010,11 @@ void display()
         color3 = RED;
     }
 
-    glm::mat4 cubeTranslate3 = glm::translate(glm::mat4(1.0), glm::vec3(-5.f, 20.f, -38.5));
-    glm::mat4 matRyCube3 = glm::rotate<float>(glm::mat4(1.0), (-90. / 180.) * M_PI, glm::vec3(0.0, 1.0, 0.0));
-    glm::mat4 matSCube3 = glm::scale(glm::mat4(1.0), glm::vec3(1.f, 2.f, 1.f));
+    glm::mat4 cubeTranslate3 = glm::translate(glm::mat4(1.0), glm::vec3(-10.f, 0.f, -100.f));
 
-    glm::mat4 cubeMove3 = glm::translate(glm::mat4(1.0), glm::vec3(0.f, quadY, quadZ));
+    glm::mat4 modelMatCube3 = tempMove1 * cubeTranslate3 * matRyCube1 * matSCube1;
 
-    glm::mat4 tempMove3 = glm::translate(glm::mat4(1.0), glm::vec3(-cubeX, cubeY, cubeZ));
-
-    // glm::mat4 tempScaleMatrix3 = glm::scale(glm::mat4(1.0), glm::vec3(1.f, cubeZ / 10, 1.f));
-
-    glm::mat4 modelMatCube3 = tempMove3 * cubeMove3 * cubeTranslate3 * rotationOffset * matRyCube3 * matSCube3;
-
-    glm::mat4 viewMatrixCube3 = glm::translate(glm::mat4(1.0), glm::vec3(0, -quadY, -quadZ));
+    glm::mat4 viewMatrixCube3 = glm::translate(glm::mat4(1.0), glm::vec3(0, -5, cubeZ));
 
     glm::mat4 modelMatCube3Inv = glm::transpose(glm::inverse(modelMatCube3));
     glm::mat4 perspMatCube3 = glm::perspective(glm::radians(90.0f), GLfloat(gWidth / gHeight), 0.1f, 200.f);
@@ -1019,13 +1025,13 @@ void display()
     glUniformMatrix4fv(glGetUniformLocation(gProgram[cube3.program_id], "viewingMat"), 1, GL_FALSE, glm::value_ptr(viewMatrixCube3));
     glUniform3fv(glGetUniformLocation(gProgram[cube3.program_id], "cubeColor"), 1, glm::value_ptr(color3));
     cube3.draw();
-    cubeY -= 0.075;
-    cubeZ += 0.1;
 
-    cubeX += 0.0075;
+    quadZ -= 0.2;
+    quadY -= 0.2;
+    cubeZ += 0.2;
 
-    // can be changed
-    if (cubeZ > 33)
+
+    if (cubeZ > 50)
     {
         // pick yellow cube
         yellow_index = generateAndPrintRandomFloats();
@@ -1033,6 +1039,18 @@ void display()
         cubeZ = 0;
         cubeY = 0;
         cubeX = 0;
+    }
+
+    glm::vec3 bunnyMin = glm::vec3(modelMat * glm::vec4(bunny.min_X, bunny.min_Y, bunny.min_Z, 1.0));
+    glm::vec3 bunnyMax = glm::vec3(modelMat * glm::vec4(bunny.max_X, bunny.max_Y, bunny.max_Z, 1.0));
+
+    glm::vec3 cubeMin = glm::vec3(modelMatCube1 * glm::vec4(cube1.min_X, cube1.min_Y, cube1.min_Z, 1.0));
+    glm::vec3 cubeMax = glm::vec3(modelMatCube1 * glm::vec4(cube1.max_X, cube1.max_Y, cube1.max_Z, 1.0));
+
+    if (checkBoundingBoxIntersection(bunnyMin, bunnyMax, cubeMin, cubeMax))
+    {
+        // Intersection detected, handle it as needed
+        std::cout << "Intersection detected!" << std::endl;
     }
 
     score += 1 + jump_multiplier;
