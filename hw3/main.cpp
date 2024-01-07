@@ -893,7 +893,9 @@ void display()
 
     glm::mat4 tempMove1 = glm::translate(glm::mat4(1.0), glm::vec3(0, cubeY, cubeZ));
 
-    glm::mat4 modelMatCube1 = tempMove1 * cubeMove1 * cubeTranslate * matRyCube1 * matSCube1;
+    glm::mat4 rotationOffset = glm::rotate<float>(glm::mat4(1.0), glm::radians(18.0f), glm::vec3(1.0, 0.0, 0.0));
+
+    glm::mat4 modelMatCube1 = tempMove1 * cubeMove1 * cubeTranslate * rotationOffset * matRyCube1 * matSCube1;
 
     glm::mat4 viewMatrixCube1 = glm::translate(glm::mat4(1.0), glm::vec3(0, -quadY, -quadZ));
 
@@ -916,7 +918,7 @@ void display()
 
     glm::mat4 tempMove2 = glm::translate(glm::mat4(1.0), glm::vec3(0, cubeY, cubeZ));
 
-    glm::mat4 modelMatCube2 = tempMove2 * cubeMove2 * cubeTranslate2 * matRyCube2 * matSCube2;
+    glm::mat4 modelMatCube2 = tempMove2 * cubeMove2 * cubeTranslate2 * rotationOffset * matRyCube2 * matSCube2;
 
     glm::mat4 viewMatrixCube2 = glm::translate(glm::mat4(1.0), glm::vec3(cubeX, -quadY, -quadZ));
 
@@ -941,7 +943,7 @@ void display()
 
     // glm::mat4 tempScaleMatrix3 = glm::scale(glm::mat4(1.0), glm::vec3(1.f, cubeZ / 10, 1.f));
 
-    glm::mat4 modelMatCube3 = tempMove3 * cubeMove3 * cubeTranslate3 * matRyCube3 * matSCube3;
+    glm::mat4 modelMatCube3 = tempMove3 * cubeMove3 * cubeTranslate3 * rotationOffset * matRyCube3 * matSCube3;
 
     glm::mat4 viewMatrixCube3 = glm::translate(glm::mat4(1.0), glm::vec3(0, -quadY, -quadZ));
 
