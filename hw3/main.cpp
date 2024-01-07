@@ -788,7 +788,9 @@ void renderText(const std::string &text, GLfloat x, GLfloat y, GLfloat scale, gl
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-#define MAX_MOVE 6
+#define MAX_MOVE 7
+#define BUNNY_SCALE 1.25
+
 void display()
 {
     glClearColor(0, 0, 0, 1);
@@ -799,20 +801,24 @@ void display()
     // QUAD PART
     glUseProgram(gProgram[2]);
     // glLoadIdentity();
-    float scaleFrag = 0.25f; // Adjust this to control the size of the checker squares
+    float scaleFrag = 0.1f; // Adjust this to control the size of the checker squares
     glUniform1f(glGetUniformLocation(gProgram[quad.program_id], "scale"), scaleFrag);
     glm::vec3 color1 = glm::vec3(0.0, 0.0, 0.0); // Black
     glm::vec3 color2 = glm::vec3(1.0, 1.0, 1.0); // White
     glUniform3fv(glGetUniformLocation(gProgram[quad.program_id], "color1"), 1, glm::value_ptr(color1));
     glUniform3fv(glGetUniformLocation(gProgram[quad.program_id], "color2"), 1, glm::value_ptr(color2));
 
-    glm::mat4 initTranslationY_quad = glm::translate(glm::mat4(1.0), glm::vec3(0.f + quadX, -7.f + quadY, -10.f + quadZ));
+    glm::mat4 initTranslationY_quad = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -7.f, -10.f));
     glm::mat4 initTranslationZ_quad = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -0.f, -10.f));
     glm::mat4 matRy_quad = glm::rotate<float>(glm::mat4(1.0), (-45. / 180.) * M_PI, glm::vec3(1.0, 0.0, 0.0));
-    glm::mat4 matS_quad = glm::scale(glm::mat4(1.0), glm::vec3(8, 100, 1.0f));
+    glm::mat4 matS_quad = glm::scale(glm::mat4(1.0), glm::vec3(20, 100, 1.0f));
     // ... (previous code)
 
-    glm::mat4 modelMatQuad = initTranslationY_quad * matRy_quad * matS_quad;
+    // -z translation
+    glm::mat4 movingQuad = glm::translate(glm::mat4(1.0), glm::vec3(quadX, quadY, quadZ));
+
+    glm::mat4 modelMatQuad = movingQuad * initTranslationY_quad * matRy_quad * matS_quad;
+
     glm::mat4 modelMatInvQuad = glm::transpose(glm::inverse(modelMatQuad));
 
     // Set a large value for the far clipping plane
@@ -823,8 +829,8 @@ void display()
     glUniformMatrix4fv(glGetUniformLocation(gProgram[quad.program_id], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatInvQuad));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[quad.program_id], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMatQuad));
 
-    glm::vec3 newEyePos = glm::vec3(5, 0, 0); // Replace newX, newY, and newZ with your desired eye position
-    glUniform3fv(glGetUniformLocation(gProgram[quad.program_id], "eyePos"), 1, glm::value_ptr(newEyePos));
+    // glm::vec3 newEyePos = glm::vec3(5, 0, 0); // Replace newX, newY, and newZ with your desired eye position
+    // glUniform3fv(glGetUniformLocation(gProgram[quad.program_id], "eyePos"), 1, glm::value_ptr(newEyePos));
 
     quad.draw();
 
@@ -835,9 +841,9 @@ void display()
     glm::mat4 initTranslationY = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -6.f, -10.f));
     glm::mat4 initTranslationZ = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -0.f, -10.f));
     glm::mat4 matRy = glm::rotate<float>(glm::mat4(1.0), (-90. / 180.) * M_PI, glm::vec3(0.0, 1.0, 0.0));
-    glm::mat4 matS = glm::scale(glm::mat4(1.0), glm::vec3(0.5, 0.5, 0.5));
+    glm::mat4 matS = glm::scale(glm::mat4(1.0), glm::vec3(BUNNY_SCALE, BUNNY_SCALE, BUNNY_SCALE));
 
-    glm::mat4 modelMat = initTranslationY * matRy;
+    glm::mat4 modelMat = initTranslationY * matRy * matS;
 
     // at this point bunny is at bottom of the window
 
@@ -912,7 +918,7 @@ void display()
         jump = glm::translate(glm::mat4(1.0), glm::vec3(0.f, translateY, 0.f));
     }
 
-    jump_multiplier += 0.0001f;
+    jump_multiplier += 0.0002f;
 
     modelMat = jump * modelMat;
 
@@ -928,11 +934,11 @@ void display()
     float scaleX = static_cast<float>(gWidth) / 1024;
     float scaleY = static_cast<float>(gHeight) / 800;
     float scale = 1 * std::min(scaleX, scaleY);
-    //std::cout << scale << endl;
-    // TEXT PART
+    // std::cout << scale << endl;
+    //  TEXT PART
     std::string scoreString = "Score: " + std::to_string(score);
 
-    float textHeight = 100*scale; // Assuming the text height is around 48 pixels
+    float textHeight = 100 * scale; // Assuming the text height is around 48 pixels
     renderText(scoreString, 10, gHeight - textHeight - 10, scale, glm::vec3(0, 1, 1));
 
     // assert(glGetError() == GL_NO_ERROR);
