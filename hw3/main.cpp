@@ -22,7 +22,7 @@
 
 using namespace std;
 
-GLuint gProgram[3];
+GLuint gProgram[6];
 // GLint gIntensityLoc;
 // float gIntensity = 1000;
 int gWidth = 1024, gHeight = 800;
@@ -221,8 +221,16 @@ public:
     {
         gProgram[this->program_id] = glCreateProgram();
 
-        createVS(gProgram[this->program_id], name + "_vert.glsl");
-        createFS(gProgram[this->program_id], name + "_frag.glsl");
+        if (this->program_id > 2)
+        {
+            createVS(gProgram[this->program_id], "cube_vert.glsl");
+            createFS(gProgram[this->program_id], "cube_frag.glsl");
+        }
+        else
+        {
+            createVS(gProgram[this->program_id], name + "_vert.glsl");
+            createFS(gProgram[this->program_id], name + "_frag.glsl");
+        }
 
         glBindAttribLocation(gProgram[this->program_id], 0, "inVertex"); //
         glBindAttribLocation(gProgram[this->program_id], 1, "inNormal");
@@ -230,8 +238,8 @@ public:
         glLinkProgram(gProgram[this->program_id]);
         glUseProgram(gProgram[program_id]);
 
-        // cout << "shader_program_id = " << this->program_id << endl;
-        // cout << "program_name = " << this->name << endl;
+        cout << "shader_program_id = " << this->program_id << endl;
+        cout << "program_name = " << this->name << endl;
     }
 
     void draw()
@@ -260,6 +268,9 @@ static float quadZ = 0;
 
 Object bunny(0, "bunny"); // programId = 0
 Object quad(2, "quad");   // programId = 2
+Object cube1(3, "cube1"); // programId = 3
+Object cube2(4, "cube2"); // programId = 4
+Object cube3(5, "cube3"); // programId = 5
 
 /*
 bool ParseObj(const string &fileName)
@@ -552,83 +563,6 @@ void initTextShaders()
     glLinkProgram(gProgram[1]);
 }
 
-/*void initVBO()
-{
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-    assert(glGetError() == GL_NONE);
-
-    gluErrorString(glGetError());
-
-    glGenBuffers(1, &gVertexAttribBuffer);
-    glGenBuffers(1, &gIndexBuffer);
-
-    gluErrorString(glGetError());
-
-    assert(gVertexAttribBuffer > 0 && gIndexBuffer > 0);
-
-    glBindBuffer(GL_ARRAY_BUFFER, gVertexAttribBuffer);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gIndexBuffer);
-
-    gVertexDataSizeInBytes = gVertices.size() * 3 * sizeof(GLfloat);
-    gNormalDataSizeInBytes = gNormals.size() * 3 * sizeof(GLfloat);
-    int indexDataSizeInBytes = gFaces.size() * 3 * sizeof(GLuint);
-    GLfloat *vertexData = new GLfloat[gVertices.size() * 3];
-    GLfloat *normalData = new GLfloat[gNormals.size() * 3];
-    GLuint *indexData = new GLuint[gFaces.size() * 3];
-
-    float minX = 1e6, maxX = -1e6;
-    float minY = 1e6, maxY = -1e6;
-    float minZ = 1e6, maxZ = -1e6;
-
-    for (int i = 0; i < gVertices.size(); ++i)
-    {
-        vertexData[3 * i] = gVertices[i].x;
-        vertexData[3 * i + 1] = gVertices[i].y;
-        vertexData[3 * i + 2] = gVertices[i].z;
-
-        minX = std::min(minX, gVertices[i].x);
-        maxX = std::max(maxX, gVertices[i].x);
-        minY = std::min(minY, gVertices[i].y);
-        maxY = std::max(maxY, gVertices[i].y);
-        minZ = std::min(minZ, gVertices[i].z);
-        maxZ = std::max(maxZ, gVertices[i].z);
-    }
-
-    // std::cout << "minX = " << minX << std::endl;
-    // std::cout << "maxX = " << maxX << std::endl;
-    // std::cout << "minY = " << minY << std::endl;
-    // std::cout << "maxY = " << maxY << std::endl;
-    // std::cout << "minZ = " << minZ << std::endl;
-    // std::cout << "maxZ = " << maxZ << std::endl;
-
-    for (int i = 0; i < gNormals.size(); ++i)
-    {
-        normalData[3 * i] = gNormals[i].x;
-        normalData[3 * i + 1] = gNormals[i].y;
-        normalData[3 * i + 2] = gNormals[i].z;
-    }
-
-    for (int i = 0; i < gFaces.size(); ++i)
-    {
-        indexData[3 * i] = gFaces[i].vIndex[0];
-        indexData[3 * i + 1] = gFaces[i].vIndex[1];
-        indexData[3 * i + 2] = gFaces[i].vIndex[2];
-    }
-
-    glBufferData(GL_ARRAY_BUFFER, gVertexDataSizeInBytes + gNormalDataSizeInBytes, 0, GL_STATIC_DRAW);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, gVertexDataSizeInBytes, vertexData);
-    glBufferSubData(GL_ARRAY_BUFFER, gVertexDataSizeInBytes, gNormalDataSizeInBytes, normalData);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexDataSizeInBytes, indexData, GL_STATIC_DRAW);
-
-    // done copying; can free now
-    delete[] vertexData;
-    delete[] normalData;
-    delete[] indexData;
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataSizeInBytes));
-}*/
 void initFonts(int windowWidth, int windowHeight)
 {
     // Set OpenGL options
@@ -721,6 +655,9 @@ void init()
 
     ParseObj2("bunny.obj", bunny);
     ParseObj2("quad.obj", quad);
+    ParseObj2("cube.obj", cube1);
+    ParseObj2("cube.obj", cube2);
+    ParseObj2("cube.obj", cube3);
     gluErrorString(glGetError());
 
     glEnable(GL_DEPTH_TEST);
@@ -728,14 +665,21 @@ void init()
     initTextShaders();
     bunny.initShaders();
     quad.initShaders();
+    cube1.initShaders();
+    cube2.initShaders();
+    cube3.initShaders();
 
     bunny.initVBO();
-    glEnable(GL_DEPTH_TEST);
-
     quad.initVBO();
+    cube1.initVBO();
+    cube2.initVBO();
+    cube3.initVBO();
+
+    cout << cube1.faces.size() << endl;
 
     cout << quad.name << endl;
     cout << bunny.name << endl;
+    cout << cube1.name << endl;
 
     initFonts(gWidth, gHeight);
 }
@@ -791,8 +735,9 @@ void renderText(const std::string &text, GLfloat x, GLfloat y, GLfloat scale, gl
 #define MAX_MOVE 7
 #define BUNNY_SCALE 1.25
 
-static float quadYMulti = 1.f;
-static float quadZMulti = 1.f;
+static float cubeX = 0;
+static float cubeY = 0;
+static float cubeZ = 0;
 void display()
 {
     glClearColor(0, 0, 0, 1);
@@ -801,7 +746,7 @@ void display()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
     // QUAD PART
-    glUseProgram(gProgram[2]);
+    glUseProgram(gProgram[quad.program_id]);
     // glLoadIdentity();
     float scaleFrag = 0.1f; // Adjust this to control the size of the checker squares
     glUniform1f(glGetUniformLocation(gProgram[quad.program_id], "scale"), scaleFrag);
@@ -817,7 +762,7 @@ void display()
     // ... (previous code)
 
     // -z translation
-    glm::mat4 movingQuad = glm::translate(glm::mat4(1.0), glm::vec3(0, quadY * quadYMulti, quadZ * quadZMulti));
+    glm::mat4 movingQuad = glm::translate(glm::mat4(1.0), glm::vec3(0, quadY, quadZ));
 
     glm::mat4 modelMatQuad = movingQuad * initTranslationY_quad * matRy_quad * matS_quad;
     glm::mat4 viewMatrixQuad = glm::translate(glm::mat4(1.0), glm::vec3(0, -quadY, -quadZ));
@@ -836,7 +781,7 @@ void display()
     quad.draw();
 
     // BUNNY PART
-    glUseProgram(gProgram[0]);
+    glUseProgram(gProgram[bunny.program_id]);
     // glLoadIdentity();
 
     glm::mat4 initTranslationY = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -6.f, -10.f));
@@ -922,8 +867,8 @@ void display()
     jump_multiplier += 0.0002f;
 
     modelMat = jump * modelMat;
-    modelMat = glm::translate(glm::mat4(1.0), glm::vec3(0, quadY * quadYMulti, quadZ * quadZMulti)) * modelMat;
-    glm::mat4 viewMatrix = glm::translate(glm::mat4(1.0), glm::vec3(0, -quadY * quadYMulti, -quadZ * quadZMulti));
+    modelMat = glm::translate(glm::mat4(1.0), glm::vec3(0, quadY, quadZ)) * modelMat;
+    glm::mat4 viewMatrix = glm::translate(glm::mat4(1.0), glm::vec3(0, -quadY, -quadZ));
 
     glm::mat4 modelMatInv = glm::transpose(glm::inverse(modelMat));
     glm::mat4 perspMat = glm::perspective(glm::radians(90.0f), GLfloat(gWidth / gHeight), 0.1f, 200.f);
@@ -935,8 +880,91 @@ void display()
     bunny.draw();
     quadZ -= 0.2;
     quadY -= 0.2;
-    // quadZMulti += 0.1f;
-    // quadYMulti += 0.1f;
+
+    // CUBE PART
+
+    glUseProgram(gProgram[cube1.program_id]);
+
+    glm::mat4 cubeTranslate = glm::translate(glm::mat4(1.0), glm::vec3(0.f, 20.f, -38.5));
+    glm::mat4 matRyCube1 = glm::rotate<float>(glm::mat4(1.0), (-90. / 180.) * M_PI, glm::vec3(0.0, 1.0, 0.0));
+    glm::mat4 matSCube1 = glm::scale(glm::mat4(1.0), glm::vec3(1.f, 2.f, 1.f));
+
+    glm::mat4 cubeMove1 = glm::translate(glm::mat4(1.0), glm::vec3(0.f, quadY, quadZ));
+
+    glm::mat4 tempMove1 = glm::translate(glm::mat4(1.0), glm::vec3(0, cubeY, cubeZ));
+
+    glm::mat4 modelMatCube1 = tempMove1 * cubeMove1 * cubeTranslate * matRyCube1 * matSCube1;
+
+    glm::mat4 viewMatrixCube1 = glm::translate(glm::mat4(1.0), glm::vec3(0, -quadY, -quadZ));
+
+    glm::mat4 modelMatCube1Inv = glm::transpose(glm::inverse(modelMatCube1));
+    glm::mat4 perspMatCube1 = glm::perspective(glm::radians(90.0f), GLfloat(gWidth / gHeight), 0.1f, 200.f);
+
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube1.program_id], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMatCube1));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube1.program_id], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatCube1Inv));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube1.program_id], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMatCube1));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube1.program_id], "viewingMat"), 1, GL_FALSE, glm::value_ptr(viewMatrixCube1));
+    cube1.draw();
+
+    glUseProgram(gProgram[cube2.program_id]);
+
+    glm::mat4 cubeTranslate2 = glm::translate(glm::mat4(1.0), glm::vec3(5.f, 20.f, -38.5));
+    glm::mat4 matRyCube2 = glm::rotate<float>(glm::mat4(1.0), (-90. / 180.) * M_PI, glm::vec3(0.0, 1.0, 0.0));
+    glm::mat4 matSCube2 = glm::scale(glm::mat4(1.0), glm::vec3(1.f, 2.f, 1.f));
+
+    glm::mat4 cubeMove2 = glm::translate(glm::mat4(1.0), glm::vec3(0.f, quadY, quadZ));
+
+    glm::mat4 tempMove2 = glm::translate(glm::mat4(1.0), glm::vec3(0, cubeY, cubeZ));
+
+    glm::mat4 modelMatCube2 = tempMove2 * cubeMove2 * cubeTranslate2 * matRyCube2 * matSCube2;
+
+    glm::mat4 viewMatrixCube2 = glm::translate(glm::mat4(1.0), glm::vec3(cubeX, -quadY, -quadZ));
+
+    glm::mat4 modelMatCube2Inv = glm::transpose(glm::inverse(modelMatCube2));
+    glm::mat4 perspMatCube2 = glm::perspective(glm::radians(90.0f), GLfloat(gWidth / gHeight), 0.1f, 200.f);
+
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube2.program_id], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMatCube2));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube2.program_id], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatCube2Inv));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube2.program_id], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMatCube2));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube2.program_id], "viewingMat"), 1, GL_FALSE, glm::value_ptr(viewMatrixCube2));
+    cube2.draw();
+
+    glUseProgram(gProgram[cube3.program_id]);
+
+    glm::mat4 cubeTranslate3 = glm::translate(glm::mat4(1.0), glm::vec3(-5.f, 20.f, -38.5));
+    glm::mat4 matRyCube3 = glm::rotate<float>(glm::mat4(1.0), (-90. / 180.) * M_PI, glm::vec3(0.0, 1.0, 0.0));
+    glm::mat4 matSCube3 = glm::scale(glm::mat4(1.0), glm::vec3(1.f, 2.f, 1.f));
+
+    glm::mat4 cubeMove3 = glm::translate(glm::mat4(1.0), glm::vec3(0.f, quadY, quadZ));
+
+    glm::mat4 tempMove3 = glm::translate(glm::mat4(1.0), glm::vec3(-cubeX, cubeY, cubeZ));
+
+    // glm::mat4 tempScaleMatrix3 = glm::scale(glm::mat4(1.0), glm::vec3(1.f, cubeZ / 10, 1.f));
+
+    glm::mat4 modelMatCube3 = tempMove3 * cubeMove3 * cubeTranslate3 * matRyCube3 * matSCube3;
+
+    glm::mat4 viewMatrixCube3 = glm::translate(glm::mat4(1.0), glm::vec3(0, -quadY, -quadZ));
+
+    glm::mat4 modelMatCube3Inv = glm::transpose(glm::inverse(modelMatCube3));
+    glm::mat4 perspMatCube3 = glm::perspective(glm::radians(90.0f), GLfloat(gWidth / gHeight), 0.1f, 200.f);
+
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube3.program_id], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMatCube3));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube3.program_id], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatCube3Inv));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube3.program_id], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMatCube3));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube3.program_id], "viewingMat"), 1, GL_FALSE, glm::value_ptr(viewMatrixCube3));
+    cube3.draw();
+    cubeY -= 0.075;
+    cubeZ += 0.1;
+
+    cubeX += 0.0075;
+
+    // can be changed
+    if (cubeZ > 33)
+    {
+        cubeZ = 0;
+        cubeY = 0;
+        cubeX = 0;
+    }
 
     score += 1 + jump_multiplier;
     float scaleX = static_cast<float>(gWidth) / 1024;
@@ -1010,6 +1038,36 @@ void keyboard(GLFWwindow *window, int key, int scancode, int action, int mods)
         // cout << "right" << endl;
         // Update the translation matrix to move the object right
         // translateX += 5;
+    }
+    else if (key == GLFW_KEY_P && action == GLFW_PRESS)
+    {
+        cubeX += 0.5;
+        cout << "cubeX = " << cubeX << endl;
+    }
+    else if (key == GLFW_KEY_0 && action == GLFW_PRESS)
+    {
+        cubeX -= 0.5;
+        cout << "cubeX = " << cubeX << endl;
+    }
+    else if (key == GLFW_KEY_O && action == GLFW_PRESS)
+    {
+        cubeY += 0.5;
+        cout << "cubeY = " << cubeY << endl;
+    }
+    else if (key == GLFW_KEY_9 && action == GLFW_PRESS)
+    {
+        cubeY -= 0.5;
+        cout << "cubeY = " << cubeY << endl;
+    }
+    else if (key == GLFW_KEY_I && action == GLFW_PRESS)
+    {
+        cubeZ += 0.5;
+        cout << "cubeZ = " << cubeZ << endl;
+    }
+    else if (key == GLFW_KEY_8 && action == GLFW_PRESS)
+    {
+        cubeZ -= 0.5;
+        cout << "cubeZ = " << cubeZ << endl;
     }
     else if (key == GLFW_KEY_X && action == GLFW_PRESS)
     {
