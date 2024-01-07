@@ -15,6 +15,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <ft2build.h>
+#include <ctime>    
 #include FT_FREETYPE_H
 #include <string>
 
@@ -211,10 +212,6 @@ public:
 
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataSizeInBytes));
-
-        // cout << "program_id = " << this->program_id << endl;
-        // cout << "program_name = " << this->name << endl;
-        // cout << "vertexDatasize = " << gVertexDataSizeInBytes << endl;
     }
 
     void initShaders()
@@ -251,14 +248,10 @@ public:
         glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
 
-        // Draw the bunny
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataSizeInBytes));
 
         glDrawElements(GL_TRIANGLES, faces.size() * 3, GL_UNSIGNED_INT, 0);
-        // cout << "program_id = " << this->program_id << endl;
-        // cout << "face size= " << faces.size() << endl;
-        // cout << this->vertices[0].x << endl;
     }
 };
 
@@ -732,8 +725,47 @@ void renderText(const std::string &text, GLfloat x, GLfloat y, GLfloat scale, gl
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-#define MAX_MOVE 7
+int findIndexOfSmallest(float values[])
+{
+    float smallest = values[0];
+    int smallestIndex = 0;
+
+    for (int i = 1; i < 3; ++i)
+    {
+        if (values[i] < smallest)
+        {
+            smallest = values[i];
+            smallestIndex = i;
+        }
+    }
+
+    return smallestIndex;
+}
+
+int generateAndPrintRandomFloats()
+{
+    // Seed the random number generator
+    std::srand(static_cast<unsigned int>(std::time(nullptr)));
+
+    // Generate 3 random floats
+    float randomFloats[3];
+    for (int i = 0; i < 3; ++i)
+    {
+        randomFloats[i] = static_cast<float>(std::rand()) / RAND_MAX;
+    }
+
+    // Find the index of the smallest value
+    int smallestIndex = findIndexOfSmallest(randomFloats);
+
+    return smallestIndex;
+}
+
+#define MAX_MOVE 9
 #define BUNNY_SCALE 1.25
+
+static glm::vec3 RED = glm::vec3(0.8, 0.1, 0.1);
+static glm::vec3 YELLOW = glm::vec3(0.8, 0.8, 0.1);
+static int yellow_index = 0;
 
 static float cubeX = 0;
 static float cubeY = 0;
@@ -747,19 +779,18 @@ void display()
 
     // QUAD PART
     glUseProgram(gProgram[quad.program_id]);
-    // glLoadIdentity();
+
     float scaleFrag = 0.1f; // Adjust this to control the size of the checker squares
     glUniform1f(glGetUniformLocation(gProgram[quad.program_id], "scale"), scaleFrag);
-    glm::vec3 color1 = glm::vec3(0.0, 1.0, 1.0); // Black
-    glm::vec3 color2 = glm::vec3(1.0, 0.5, 1.0); // White
-    glUniform3fv(glGetUniformLocation(gProgram[quad.program_id], "color1"), 1, glm::value_ptr(color1));
-    glUniform3fv(glGetUniformLocation(gProgram[quad.program_id], "color2"), 1, glm::value_ptr(color2));
+    glm::vec3 color1_quad = glm::vec3(0.0, 1.0, 1.0); // Black
+    glm::vec3 color2_quad = glm::vec3(1.0, 0.5, 1.0); // White
+    glUniform3fv(glGetUniformLocation(gProgram[quad.program_id], "color1"), 1, glm::value_ptr(color1_quad));
+    glUniform3fv(glGetUniformLocation(gProgram[quad.program_id], "color2"), 1, glm::value_ptr(color2_quad));
 
     glm::mat4 initTranslationY_quad = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -7.f, -10.f));
     glm::mat4 initTranslationZ_quad = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -0.f, -10.f));
     glm::mat4 matRy_quad = glm::rotate<float>(glm::mat4(1.0), (-45. / 180.) * M_PI, glm::vec3(1.0, 0.0, 0.0));
     glm::mat4 matS_quad = glm::scale(glm::mat4(1.0), glm::vec3(20, 100, 1.0f));
-    // ... (previous code)
 
     // -z translation
     glm::mat4 movingQuad = glm::translate(glm::mat4(1.0), glm::vec3(0, quadY, quadZ));
@@ -768,8 +799,6 @@ void display()
     glm::mat4 viewMatrixQuad = glm::translate(glm::mat4(1.0), glm::vec3(0, -quadY, -quadZ));
 
     glm::mat4 modelMatInvQuad = glm::transpose(glm::inverse(modelMatQuad));
-
-    // Set a large value for the far clipping plane
 
     glm::mat4 perspMatQuad = glm::perspective(glm::radians(120.0f), GLfloat(gWidth / gHeight), 0.1f, 20000.0f);
 
@@ -881,6 +910,7 @@ void display()
     quadZ -= 0.2;
     quadY -= 0.2;
 
+
     // CUBE PART
 
     glUseProgram(gProgram[cube1.program_id]);
@@ -902,13 +932,35 @@ void display()
     glm::mat4 modelMatCube1Inv = glm::transpose(glm::inverse(modelMatCube1));
     glm::mat4 perspMatCube1 = glm::perspective(glm::radians(90.0f), GLfloat(gWidth / gHeight), 0.1f, 200.f);
 
+    glm::vec3 color1;
+
+    if (yellow_index == 0)
+    {
+        color1 = YELLOW;
+    }
+    else
+    {
+        color1 = RED;
+    }
+
     glUniformMatrix4fv(glGetUniformLocation(gProgram[cube1.program_id], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMatCube1));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[cube1.program_id], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatCube1Inv));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[cube1.program_id], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMatCube1));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[cube1.program_id], "viewingMat"), 1, GL_FALSE, glm::value_ptr(viewMatrixCube1));
+    glUniform3fv(glGetUniformLocation(gProgram[cube1.program_id], "cubeColor"), 1, glm::value_ptr(color1));
     cube1.draw();
 
     glUseProgram(gProgram[cube2.program_id]);
+
+    glm::vec3 color2;
+    if (yellow_index == 1)
+    {
+        color2 = YELLOW;
+    }
+    else
+    {
+        color2 = RED;
+    }
 
     glm::mat4 cubeTranslate2 = glm::translate(glm::mat4(1.0), glm::vec3(5.f, 20.f, -38.5));
     glm::mat4 matRyCube2 = glm::rotate<float>(glm::mat4(1.0), (-90. / 180.) * M_PI, glm::vec3(0.0, 1.0, 0.0));
@@ -929,9 +981,20 @@ void display()
     glUniformMatrix4fv(glGetUniformLocation(gProgram[cube2.program_id], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatCube2Inv));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[cube2.program_id], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMatCube2));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[cube2.program_id], "viewingMat"), 1, GL_FALSE, glm::value_ptr(viewMatrixCube2));
+    glUniform3fv(glGetUniformLocation(gProgram[cube2.program_id], "cubeColor"), 1, glm::value_ptr(color2));
     cube2.draw();
 
     glUseProgram(gProgram[cube3.program_id]);
+
+    glm::vec3 color3;
+    if (yellow_index == 2)
+    {
+        color3 = YELLOW;
+    }
+    else
+    {
+        color3 = RED;
+    }
 
     glm::mat4 cubeTranslate3 = glm::translate(glm::mat4(1.0), glm::vec3(-5.f, 20.f, -38.5));
     glm::mat4 matRyCube3 = glm::rotate<float>(glm::mat4(1.0), (-90. / 180.) * M_PI, glm::vec3(0.0, 1.0, 0.0));
@@ -954,6 +1017,7 @@ void display()
     glUniformMatrix4fv(glGetUniformLocation(gProgram[cube3.program_id], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatCube3Inv));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[cube3.program_id], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMatCube3));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[cube3.program_id], "viewingMat"), 1, GL_FALSE, glm::value_ptr(viewMatrixCube3));
+    glUniform3fv(glGetUniformLocation(gProgram[cube3.program_id], "cubeColor"), 1, glm::value_ptr(color3));
     cube3.draw();
     cubeY -= 0.075;
     cubeZ += 0.1;
@@ -963,6 +1027,9 @@ void display()
     // can be changed
     if (cubeZ > 33)
     {
+        // pick yellow cube
+        yellow_index = generateAndPrintRandomFloats();
+
         cubeZ = 0;
         cubeY = 0;
         cubeX = 0;
