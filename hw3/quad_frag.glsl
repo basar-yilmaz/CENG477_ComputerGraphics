@@ -1,28 +1,18 @@
-#version 120
+#version 330 core
 
-vec3 lightPos = vec3(-5, 5, -5);
-uniform vec3 eyePos; // Make eyePos a uniform to be set from your application
+in vec4 fragPos; // The position in world space
 
-vec3 I = vec3(0.8, 0.8, 0.1);
+uniform float scale; // Controls the size of the checkerboard squares
+uniform vec3 color1; // First color (e.g., black)
+uniform vec3 color2; // Second color (e.g., white)
 
-vec3 kd = vec3(0.1, 0.6, 0.3);
-vec3 ka = vec3(0.1, 0.1, 0.1);
-vec3 ks = vec3(0.1, 0.6, 0.3);
+out vec4 outColor;
 
-varying vec4 fragPos;
-varying vec3 N;
+void main() {
+    // Apply the checkerboard pattern
+    vec2 checker = floor(fragPos.xz * scale); // Modify the scale to control the size of the squares
+    float checkerPattern = mod(checker.x + checker.y, 2.0); // Checkerboard pattern
 
-void main(void)
-{
-    vec3 viewDir = normalize(eyePos - vec3(fragPos));
-    vec3 lightDir = normalize(lightPos - vec3(fragPos));
-    vec3 halfwayDir = normalize(lightDir + viewDir);
-
-    float NdotL = dot(N, lightDir);
-    float NdotH = dot(N, halfwayDir);
-
-    vec3 diffuseColor = I * kd * max(0, NdotL);
-    vec3 specularColor = I * ks * pow(max(0, NdotH), 20);
-
-    gl_FragColor = vec4(diffuseColor + specularColor, 1);
+    // Choose the color based on the checker pattern
+    outColor = mix(vec4(color1, 1.0), vec4(color2, 1.0), step(0.5, checkerPattern));
 }

@@ -236,6 +236,7 @@ public:
 
     void draw()
     {
+        glClear(GL_DEPTH_BUFFER_BIT);
         glUseProgram(gProgram[this->program_id]);
 
         // cout << "program_id = " << this->program_id << endl;
@@ -729,6 +730,8 @@ void init()
     quad.initShaders();
 
     bunny.initVBO();
+    glEnable(GL_DEPTH_TEST);
+
     quad.initVBO();
 
     cout << quad.name << endl;
@@ -796,19 +799,25 @@ void display()
     // QUAD PART
     glUseProgram(gProgram[2]);
     // glLoadIdentity();
+    float scaleFrag = 0.25f; // Adjust this to control the size of the checker squares
+    glUniform1f(glGetUniformLocation(gProgram[quad.program_id], "scale"), scaleFrag);
+    glm::vec3 color1 = glm::vec3(0.0, 0.0, 0.0); // Black
+    glm::vec3 color2 = glm::vec3(1.0, 1.0, 1.0); // White
+    glUniform3fv(glGetUniformLocation(gProgram[quad.program_id], "color1"), 1, glm::value_ptr(color1));
+    glUniform3fv(glGetUniformLocation(gProgram[quad.program_id], "color2"), 1, glm::value_ptr(color2));
 
-    glm::mat4 initTranslationY_quad = glm::translate(glm::mat4(1.0), glm::vec3(0.f + quadX, -5.f + quadY, -10.f + quadZ));
+    glm::mat4 initTranslationY_quad = glm::translate(glm::mat4(1.0), glm::vec3(0.f + quadX, -7.f + quadY, -10.f + quadZ));
     glm::mat4 initTranslationZ_quad = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -0.f, -10.f));
     glm::mat4 matRy_quad = glm::rotate<float>(glm::mat4(1.0), (-45. / 180.) * M_PI, glm::vec3(1.0, 0.0, 0.0));
-    // glm::mat4 matS = glm::scale(glm::mat4(1.0), glm::vec3(0.5, 0.5, 0.5));
+    glm::mat4 matS_quad = glm::scale(glm::mat4(1.0), glm::vec3(8, 100, 1.0f));
     // ... (previous code)
 
-    glm::mat4 modelMatQuad = initTranslationY_quad * matRy_quad;
+    glm::mat4 modelMatQuad = initTranslationY_quad * matRy_quad * matS_quad;
     glm::mat4 modelMatInvQuad = glm::transpose(glm::inverse(modelMatQuad));
 
     // Set a large value for the far clipping plane
 
-    glm::mat4 perspMatQuad = glm::perspective(glm::radians(90.0f), GLfloat(gWidth / gHeight), 0.1f, 200.f);
+    glm::mat4 perspMatQuad = glm::perspective(glm::radians(120.0f), GLfloat(gWidth / gHeight), 0.1f, 2000.0f);
 
     glUniformMatrix4fv(glGetUniformLocation(gProgram[quad.program_id], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMatQuad));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[quad.program_id], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatInvQuad));
@@ -919,11 +928,11 @@ void display()
     float scaleX = static_cast<float>(gWidth) / 1024;
     float scaleY = static_cast<float>(gHeight) / 800;
     float scale = 1 * std::min(scaleX, scaleY);
-
+    //std::cout << scale << endl;
     // TEXT PART
     std::string scoreString = "Score: " + std::to_string(score);
 
-    float textHeight = 48; // Assuming the text height is around 48 pixels
+    float textHeight = 100*scale; // Assuming the text height is around 48 pixels
     renderText(scoreString, 10, gHeight - textHeight - 10, scale, glm::vec3(0, 1, 1));
 
     // assert(glGetError() == GL_NO_ERROR);
