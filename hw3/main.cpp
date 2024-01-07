@@ -782,13 +782,13 @@ static float cubeX = 0;
 static float cubeY = 0;
 static float cubeZ = 0;
 
-bool checkBoundingBoxIntersection(const glm::vec3 &minA, const glm::vec3 &maxA, const glm::vec3 &minB, const glm::vec3 &maxB)
-{
-    return (minA.x <= maxB.x && maxA.x >= minB.x) &&
-           (minA.y <= maxB.y && maxA.y >= minB.y) &&
-           (minA.z <= maxB.z && maxA.z >= minB.z);
-}
+static float jump_multiplier = 0.1f;
 
+static float accumulatior = 0.f;
+
+static float speed_up = 0.2f;
+
+static int draw_flag = -1;
 void display()
 {
     glClearColor(0, 0, 0, 1);
@@ -805,18 +805,6 @@ void display()
     glm::vec3 color2_quad = glm::vec3(1.0, 1.f, 1.0); // White
     glUniform3fv(glGetUniformLocation(gProgram[quad.program_id], "color1"), 1, glm::value_ptr(color1_quad));
     glUniform3fv(glGetUniformLocation(gProgram[quad.program_id], "color2"), 1, glm::value_ptr(color2_quad));
-
-    // glm::mat4 initTranslationY_quad = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -7.f, -10.f));
-    // glm::mat4 initTranslationZ_quad = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -0.f, -10.f));
-    // glm::mat4 matRy_quad = glm::rotate<float>(glm::mat4(1.0), (-45. / 180.) * M_PI, glm::vec3(1.0, 0.0, 0.0));
-    // glm::mat4 matS_quad = glm::scale(glm::mat4(1.0), glm::vec3(100.f, 10.f, 100.0f));
-
-    // -z translation
-    // glm::mat4 movingQuad = glm::translate(glm::mat4(1.0), glm::vec3(0, quadY, quadZ));
-
-    // glm::mat4 modelMatQuad = movingQuad * initTranslationY_quad * matRy_quad * matS_quad;
-
-    // glm::mat4 viewMatrixQuad = glm::translate(glm::mat4(1.0), glm::vec3(0, -quadY, -quadZ));
 
     glm::mat4 tTranslate = glm::translate(glm::mat4(1.0), glm::vec3(0.f, 0.f, -10.f));
 
@@ -899,8 +887,6 @@ void display()
         modelMat = moveRightLeft * modelMat;
     }
 
-    static float jump_multiplier = 0.1f;
-
     // jump up and down
     glm::mat4 jump;
     if (translateY < 2 && jumpFlag)
@@ -925,6 +911,7 @@ void display()
     jump_multiplier += 0.0002f;
 
     modelMat = jump * modelMat;
+
     modelMat = glm::translate(glm::mat4(1.0), glm::vec3(0, 0, quadZ)) * modelMat;
     glm::mat4 viewMatrix = glm::translate(glm::mat4(1.0), glm::vec3(0, 0, -quadZ));
 
@@ -941,7 +928,7 @@ void display()
 
     glUseProgram(gProgram[cube1.program_id]);
 
-    glm::mat4 cubeTranslate = glm::translate(glm::mat4(1.0), glm::vec3(0.f, 0.f, -100.f));
+    glm::mat4 cubeTranslate = glm::translate(glm::mat4(1.0), glm::vec3(0.f, 0.f, -150.f));
     glm::mat4 matRyCube1 = glm::rotate<float>(glm::mat4(1.0), (-90. / 180.) * M_PI, glm::vec3(0.0, 1.0, 0.0));
     glm::mat4 matSCube1 = glm::scale(glm::mat4(1.0), glm::vec3(1.f, 3.f, 1.f));
 
@@ -983,7 +970,7 @@ void display()
         color2 = RED;
     }
 
-    glm::mat4 cubeTranslate2 = glm::translate(glm::mat4(1.0), glm::vec3(10.f, 0.f, -100.f));
+    glm::mat4 cubeTranslate2 = glm::translate(glm::mat4(1.0), glm::vec3(10.f, 0.f, -150.f));
 
     glm::mat4 modelMatCube2 = tempMove1 * cubeTranslate2 * matRyCube1 * matSCube1;
 
@@ -1010,7 +997,7 @@ void display()
         color3 = RED;
     }
 
-    glm::mat4 cubeTranslate3 = glm::translate(glm::mat4(1.0), glm::vec3(-10.f, 0.f, -100.f));
+    glm::mat4 cubeTranslate3 = glm::translate(glm::mat4(1.0), glm::vec3(-10.f, 0.f, -150.f));
 
     glm::mat4 modelMatCube3 = tempMove1 * cubeTranslate3 * matRyCube1 * matSCube1;
 
@@ -1026,45 +1013,87 @@ void display()
     glUniform3fv(glGetUniformLocation(gProgram[cube3.program_id], "cubeColor"), 1, glm::value_ptr(color3));
     cube3.draw();
 
-    quadZ -= 0.2;
-    quadY -= 0.2;
-    cubeZ += 0.2;
+    speed_up += 0.0005f;
+    quadZ -= speed_up;
+    cubeZ += speed_up;
 
-
-    if (cubeZ > 50)
+    if (direction == RIGHT)
     {
+        if (cubeZ - 150 > -76 && cubeZ - 150 < -74.f)
+        {
+            if (yellow_index == 1)
+            {
+                cout << "You got a point!" << endl;
+                score += 1000;
+                cout << "Your score is " << score << endl;
+            }
+            else
+            {
+                cout << "You lost a point!" << endl;
+                score -= 1000;
+                cout << "Your score is " << score << endl;
+            }
+        }
+    }
+    else if (direction == LEFT)
+    {
+        if (cubeZ - 150 > -76 && cubeZ - 150 < -74.f)
+        {
+            if (yellow_index == 2)
+            {
+                cout << "You got a point!" << endl;
+                score += 1000;
+                cout << "Your score is " << score << endl;
+            }
+            else
+            {
+                cout << "You lost a point!" << endl;
+                score -= 1000;
+                cout << "Your score is " << score << endl;
+            }
+        }
+    }
+    else
+    {
+        if (cubeZ - 150 > -76 && cubeZ - 150 < -74.f)
+        {
+            if (yellow_index == 0)
+            {
+                cout << "You got a point!" << endl;
+                score += 1000;
+                cout << "Your score is " << score << endl;
+            }
+            else
+            {
+                cout << "You lost a point!" << endl;
+                score -= 1000;
+                cout << "Your score is " << score << endl;
+            }
+        }
+    }
+    // it is hardcoding, but it works (change!)
+    if (cubeZ > 75)
+    {
+        cout << "cubeZ = " << cubeZ - 150 << endl;
+        cout << "quadZ = " << quadZ << endl;
+        cout << accumulatior << endl;
         // pick yellow cube
         yellow_index = generateAndPrintRandomFloats();
-
         cubeZ = 0;
         cubeY = 0;
         cubeX = 0;
-    }
-
-    glm::vec3 bunnyMin = glm::vec3(modelMat * glm::vec4(bunny.min_X, bunny.min_Y, bunny.min_Z, 1.0));
-    glm::vec3 bunnyMax = glm::vec3(modelMat * glm::vec4(bunny.max_X, bunny.max_Y, bunny.max_Z, 1.0));
-
-    glm::vec3 cubeMin = glm::vec3(modelMatCube1 * glm::vec4(cube1.min_X, cube1.min_Y, cube1.min_Z, 1.0));
-    glm::vec3 cubeMax = glm::vec3(modelMatCube1 * glm::vec4(cube1.max_X, cube1.max_Y, cube1.max_Z, 1.0));
-
-    if (checkBoundingBoxIntersection(bunnyMin, bunnyMax, cubeMin, cubeMax))
-    {
-        // Intersection detected, handle it as needed
-        std::cout << "Intersection detected!" << std::endl;
     }
 
     score += 1 + jump_multiplier;
     float scaleX = static_cast<float>(gWidth) / 1024;
     float scaleY = static_cast<float>(gHeight) / 800;
     float scale = 1 * std::min(scaleX, scaleY);
-    // std::cout << scale << endl;
+
     //  TEXT PART
     std::string scoreString = "Score: " + std::to_string(score);
 
     float textHeight = 100 * scale; // Assuming the text height is around 48 pixels
     renderText(scoreString, 10, gHeight - textHeight - 10, scale, glm::vec3(0, 1, 1));
-
-    // assert(glGetError() == GL_NO_ERROR);
 
     gluErrorString(glGetError());
 }
@@ -1125,6 +1154,20 @@ void keyboard(GLFWwindow *window, int key, int scancode, int action, int mods)
         // cout << "right" << endl;
         // Update the translation matrix to move the object right
         // translateX += 5;
+    }
+    else if (key == GLFW_KEY_R && action == GLFW_PRESS)
+    {
+        direction = NORMAL;
+        translateX = 0;
+        translateY = 0;
+        jumpFlag = 0;
+        score = 0;
+        speed_up = 0.2f;
+        jump_multiplier = 0.1f;
+        quadZ = 0;
+        cubeZ = 0;
+        cubeY = 0;
+        cubeX = 0;
     }
     else if (key == GLFW_KEY_P && action == GLFW_PRESS)
     {
