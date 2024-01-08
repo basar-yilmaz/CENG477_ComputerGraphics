@@ -624,7 +624,7 @@ void initFonts(int windowWidth, int windowHeight)
             texture,
             glm::ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows),
             glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top),
-            face->glyph->advance.x};
+            (GLuint)face->glyph->advance.x};
         Characters.insert(std::pair<GLchar, Character>(c, character));
     }
 
@@ -770,8 +770,8 @@ int generateAndPrintRandomFloats()
 #define MAX_MOVE 9
 #define BUNNY_SCALE 1.25
 
-static glm::vec3 RED = glm::vec3(0.8, 0.1, 0.1);
-static glm::vec3 YELLOW = glm::vec3(0.8, 0.8, 0.1);
+static glm::vec3 RED = glm::vec3(1.0, 0.0, 0.0);
+static glm::vec3 YELLOW = glm::vec3(1.0, 1.0, 0.0);
 static int yellow_index = 0;
 
 static float quadX = 0;
@@ -784,8 +784,6 @@ static float cubeZ = 0;
 
 static float jump_multiplier = 0.1f;
 
-static float accumulatior = 0.f;
-
 static float speed_up = 0.2f;
 
 static int draw_flag = -1;
@@ -795,8 +793,8 @@ static bool deadFlag = false;
 static float bunnyRotationAngle = 0.f;
 
 static bool scoreFlag = false;
-static bool hasRotated = false;
 static float rotationThreshold = 360.f;
+
 void display()
 {
     glClearColor(0, 0, 0, 1);
@@ -807,7 +805,7 @@ void display()
     const float epsilon = 0.2f;
     if (direction == RIGHT)
     {
-        if (cubeZ > 69.5f - epsilon && cubeZ < 70.f + epsilon)
+        if (cubeZ > 69.2f - epsilon && cubeZ < 70.2f + epsilon)
         {
             draw_flag = 2;
             if (yellow_index == 1 && !deadFlag)
@@ -825,7 +823,7 @@ void display()
     }
     else if (direction == LEFT)
     {
-        if (cubeZ > 69.5f - epsilon && cubeZ < 70.f + epsilon)
+        if (cubeZ > 69.2f - epsilon && cubeZ < 70.2f + epsilon)
         {
             draw_flag = 3;
             if (yellow_index == 2 && !deadFlag)
@@ -844,7 +842,7 @@ void display()
     else
     {
         // NORMAL
-        if (cubeZ > 69.5f - epsilon && cubeZ < 70.f + epsilon)
+        if (cubeZ > 69.2f - epsilon && cubeZ < 70.2f + epsilon)
         {
             draw_flag = 1;
             if (yellow_index == 0 && !deadFlag)
@@ -866,8 +864,8 @@ void display()
 
     float scaleFrag = 0.2f; // Adjust this to control the size of the checker squares
     glUniform1f(glGetUniformLocation(gProgram[quad.program_id], "scale"), scaleFrag);
-    glm::vec3 color1_quad = glm::vec3(0.0, 0, 0.0);   // Black
-    glm::vec3 color2_quad = glm::vec3(1.0, 1.f, 1.0); // White
+    glm::vec3 color1_quad = glm::vec3(0.68, 0.85, 0.9);
+    glm::vec3 color2_quad = glm::vec3(0.0, 0.0, 0.5);
     glUniform3fv(glGetUniformLocation(gProgram[quad.program_id], "color1"), 1, glm::value_ptr(color1_quad));
     glUniform3fv(glGetUniformLocation(gProgram[quad.program_id], "color2"), 1, glm::value_ptr(color2_quad));
 
@@ -1202,6 +1200,8 @@ void keyboard(GLFWwindow *window, int key, int scancode, int action, int mods)
         cubeZ = 0;
         cubeY = 0;
         cubeX = 0;
+        deadFlag = false;
+        draw_flag = -1;
     }
     // else if (key == GLFW_KEY_P && action == GLFW_PRESS)
     // {
