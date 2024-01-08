@@ -789,12 +789,77 @@ static float accumulatior = 0.f;
 static float speed_up = 0.2f;
 
 static int draw_flag = -1;
+
+static bool deadFlag = false;
+
+static float bunnyRotationAngle = 0.f;
+
+static bool scoreFlag = false;
+static bool hasRotated = false;
+static float rotationThreshold = 360.f;
 void display()
 {
     glClearColor(0, 0, 0, 1);
     glClearDepth(1.0f);
     glClearStencil(0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+    const float epsilon = 0.2f;
+    if (direction == RIGHT)
+    {
+        if (cubeZ > 69.5f - epsilon && cubeZ < 70.f + epsilon)
+        {
+            draw_flag = 2;
+            if (yellow_index == 1 && !deadFlag)
+            {
+                scoreFlag = true;
+                score += 1000;
+            }
+            else
+            {
+                deadFlag = true;
+                speed_up = 0;
+                jumpFlag = 0;
+            }
+        }
+    }
+    else if (direction == LEFT)
+    {
+        if (cubeZ > 69.5f - epsilon && cubeZ < 70.f + epsilon)
+        {
+            draw_flag = 3;
+            if (yellow_index == 2 && !deadFlag)
+            {
+                scoreFlag = true;
+                score += 1000;
+            }
+            else
+            {
+                deadFlag = true;
+                speed_up = 0;
+                jumpFlag = 0;
+            }
+        }
+    }
+    else
+    {
+        // NORMAL
+        if (cubeZ > 69.5f - epsilon && cubeZ < 70.f + epsilon)
+        {
+            draw_flag = 1;
+            if (yellow_index == 0 && !deadFlag)
+            {
+                scoreFlag = true;
+                score += 1000;
+            }
+            else
+            {
+                deadFlag = true;
+                speed_up = 0;
+                jumpFlag = 0;
+            }
+        }
+    }
 
     // QUAD PART
     glUseProgram(gProgram[quad.program_id]);
@@ -827,16 +892,125 @@ void display()
 
     quad.draw();
 
+    // CUBE PART
+
+    glUseProgram(gProgram[cube1.program_id]);
+
+    glm::mat4 cubeTranslate = glm::translate(glm::mat4(1.0), glm::vec3(0.f, 0.f, -150.f));
+    glm::mat4 matRyCube1 = glm::rotate<float>(glm::mat4(1.0), (-90. / 180.) * M_PI, glm::vec3(0.0, 1.0, 0.0));
+    glm::mat4 matSCube1 = glm::scale(glm::mat4(1.0), glm::vec3(1.f, 3.f, 1.f));
+
+    glm::mat4 tempMove1 = glm::translate(glm::mat4(1.0), glm::vec3(0, 0, cubeZ));
+
+    glm::mat4 modelMatCube1 = tempMove1 * cubeTranslate * matRyCube1 * matSCube1;
+
+    glm::mat4 viewMatrixCube1 = glm::translate(glm::mat4(1.0), glm::vec3(0, -5, cubeZ));
+    glm::mat4 modelMatCube1Inv = glm::transpose(glm::inverse(modelMatCube1));
+    glm::mat4 perspMatCube1 = glm::perspective(glm::radians(90.0f), GLfloat(gWidth / gHeight), 0.1f, 200.f);
+
+    glm::vec3 color1;
+
+    if (yellow_index == 0)
+    {
+        color1 = YELLOW;
+    }
+    else
+    {
+        color1 = RED;
+    }
+
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube1.program_id], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMatCube1));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube1.program_id], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatCube1Inv));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube1.program_id], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMatCube1));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube1.program_id], "viewingMat"), 1, GL_FALSE, glm::value_ptr(viewMatrixCube1));
+    glUniform3fv(glGetUniformLocation(gProgram[cube1.program_id], "cubeColor"), 1, glm::value_ptr(color1));
+    if (draw_flag != 1)
+        cube1.draw();
+
+    glUseProgram(gProgram[cube2.program_id]);
+
+    glm::vec3 color2;
+    if (yellow_index == 1)
+    {
+        color2 = YELLOW;
+    }
+    else
+    {
+        color2 = RED;
+    }
+
+    glm::mat4 cubeTranslate2 = glm::translate(glm::mat4(1.0), glm::vec3(10.f, 0.f, -150.f));
+
+    glm::mat4 modelMatCube2 = tempMove1 * cubeTranslate2 * matRyCube1 * matSCube1;
+
+    glm::mat4 viewMatrixCube2 = glm::translate(glm::mat4(1.0), glm::vec3(0, -5, cubeZ));
+    glm::mat4 modelMatCube2Inv = glm::transpose(glm::inverse(modelMatCube1));
+    glm::mat4 perspMatCube2 = glm::perspective(glm::radians(90.0f), GLfloat(gWidth / gHeight), 0.1f, 200.f);
+
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube2.program_id], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMatCube2));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube2.program_id], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatCube2Inv));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube2.program_id], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMatCube2));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube2.program_id], "viewingMat"), 1, GL_FALSE, glm::value_ptr(viewMatrixCube2));
+    glUniform3fv(glGetUniformLocation(gProgram[cube2.program_id], "cubeColor"), 1, glm::value_ptr(color2));
+    if (draw_flag != 2)
+        cube2.draw();
+
+    glUseProgram(gProgram[cube3.program_id]);
+
+    glm::vec3 color3;
+    if (yellow_index == 2)
+    {
+        color3 = YELLOW;
+    }
+    else
+    {
+        color3 = RED;
+    }
+
+    glm::mat4 cubeTranslate3 = glm::translate(glm::mat4(1.0), glm::vec3(-10.f, 0.f, -150.f));
+
+    glm::mat4 modelMatCube3 = tempMove1 * cubeTranslate3 * matRyCube1 * matSCube1;
+
+    glm::mat4 viewMatrixCube3 = glm::translate(glm::mat4(1.0), glm::vec3(0, -5, cubeZ));
+
+    glm::mat4 modelMatCube3Inv = glm::transpose(glm::inverse(modelMatCube3));
+    glm::mat4 perspMatCube3 = glm::perspective(glm::radians(90.0f), GLfloat(gWidth / gHeight), 0.1f, 200.f);
+
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube3.program_id], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMatCube3));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube3.program_id], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatCube3Inv));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube3.program_id], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMatCube3));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube3.program_id], "viewingMat"), 1, GL_FALSE, glm::value_ptr(viewMatrixCube3));
+    glUniform3fv(glGetUniformLocation(gProgram[cube3.program_id], "cubeColor"), 1, glm::value_ptr(color3));
+    if (draw_flag != 3)
+        cube3.draw();
+
     // BUNNY PART
     glUseProgram(gProgram[bunny.program_id]);
-    // glLoadIdentity();
 
     glm::mat4 initTranslationY = glm::translate(glm::mat4(1.0), glm::vec3(0.f, -6.f, -10.f));
-    glm::mat4 matRy = glm::rotate<float>(glm::mat4(1.0), (-90. / 180.) * M_PI, glm::vec3(0.0, 1.0, 0.0));
+    glm::mat4 matRy = glm::rotate<float>(glm::mat4(1.0), (-90. / 180.) * M_PI + glm::radians(bunnyRotationAngle), glm::vec3(0.0, 1.0, 0.0));
+
     glm::mat4 matS = glm::scale(glm::mat4(1.0), glm::vec3(BUNNY_SCALE, BUNNY_SCALE, BUNNY_SCALE));
 
-    glm::mat4 modelMat = initTranslationY * matRy * matS;
+    glm::mat4 deadRotation = glm::rotate<float>(glm::mat4(1.0), glm::radians(-90.f), glm::vec3(0.0, 0.0, 1.0f));
 
+    glm::mat4 modelMat = initTranslationY;
+    if (deadFlag)
+    {
+        modelMat *= deadRotation;
+    }
+
+    modelMat *= matRy * matS;
+
+    if (scoreFlag && !deadFlag)
+    {
+        bunnyRotationAngle += 6.f;
+        if (bunnyRotationAngle >= rotationThreshold)
+        {
+            bunnyRotationAngle = 0.f;
+            scoreFlag = false;
+        }
+    }
     // at this point bunny is at bottom of the window
 
     // move left and right
@@ -888,8 +1062,8 @@ void display()
     }
 
     // jump up and down
-    glm::mat4 jump;
-    if (translateY < 2 && jumpFlag)
+    glm::mat4 jump = glm::translate(glm::mat4(1.0), glm::vec3(0.f, 0.f, 0.f));
+    if (translateY < 2 && jumpFlag && !deadFlag)
     {
         translateY += jump_multiplier;
         if (translateY >= 2)
@@ -898,7 +1072,7 @@ void display()
         }
         jump = glm::translate(glm::mat4(1.0), glm::vec3(0.f, translateY, 0.f));
     }
-    else
+    else if (translateY > -2 && !jumpFlag && !deadFlag)
     {
         translateY -= jump_multiplier;
         if (translateY <= -2)
@@ -908,9 +1082,11 @@ void display()
         jump = glm::translate(glm::mat4(1.0), glm::vec3(0.f, translateY, 0.f));
     }
 
-    jump_multiplier += 0.0002f;
-
-    modelMat = jump * modelMat;
+    if (!deadFlag)
+    {
+        jump_multiplier += 0.0002f;
+        modelMat = jump * modelMat;
+    }
 
     modelMat = glm::translate(glm::mat4(1.0), glm::vec3(0, 0, quadZ)) * modelMat;
     glm::mat4 viewMatrix = glm::translate(glm::mat4(1.0), glm::vec3(0, 0, -quadZ));
@@ -924,167 +1100,25 @@ void display()
     glUniformMatrix4fv(glGetUniformLocation(gProgram[bunny.program_id], "viewingMat"), 1, GL_FALSE, glm::value_ptr(viewMatrix));
     bunny.draw();
 
-    // CUBE PART
-
-    glUseProgram(gProgram[cube1.program_id]);
-
-    glm::mat4 cubeTranslate = glm::translate(glm::mat4(1.0), glm::vec3(0.f, 0.f, -150.f));
-    glm::mat4 matRyCube1 = glm::rotate<float>(glm::mat4(1.0), (-90. / 180.) * M_PI, glm::vec3(0.0, 1.0, 0.0));
-    glm::mat4 matSCube1 = glm::scale(glm::mat4(1.0), glm::vec3(1.f, 3.f, 1.f));
-
-    glm::mat4 tempMove1 = glm::translate(glm::mat4(1.0), glm::vec3(0, 0, cubeZ));
-
-    glm::mat4 modelMatCube1 = tempMove1 * cubeTranslate * matRyCube1 * matSCube1;
-
-    glm::mat4 viewMatrixCube1 = glm::translate(glm::mat4(1.0), glm::vec3(0, -5, cubeZ));
-    glm::mat4 modelMatCube1Inv = glm::transpose(glm::inverse(modelMatCube1));
-    glm::mat4 perspMatCube1 = glm::perspective(glm::radians(90.0f), GLfloat(gWidth / gHeight), 0.1f, 200.f);
-
-    glm::vec3 color1;
-
-    if (yellow_index == 0)
-    {
-        color1 = YELLOW;
-    }
-    else
-    {
-        color1 = RED;
-    }
-
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube1.program_id], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMatCube1));
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube1.program_id], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatCube1Inv));
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube1.program_id], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMatCube1));
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube1.program_id], "viewingMat"), 1, GL_FALSE, glm::value_ptr(viewMatrixCube1));
-    glUniform3fv(glGetUniformLocation(gProgram[cube1.program_id], "cubeColor"), 1, glm::value_ptr(color1));
-    cube1.draw();
-
-    glUseProgram(gProgram[cube2.program_id]);
-
-    glm::vec3 color2;
-    if (yellow_index == 1)
-    {
-        color2 = YELLOW;
-    }
-    else
-    {
-        color2 = RED;
-    }
-
-    glm::mat4 cubeTranslate2 = glm::translate(glm::mat4(1.0), glm::vec3(10.f, 0.f, -150.f));
-
-    glm::mat4 modelMatCube2 = tempMove1 * cubeTranslate2 * matRyCube1 * matSCube1;
-
-    glm::mat4 viewMatrixCube2 = glm::translate(glm::mat4(1.0), glm::vec3(0, -5, cubeZ));
-    glm::mat4 modelMatCube2Inv = glm::transpose(glm::inverse(modelMatCube1));
-    glm::mat4 perspMatCube2 = glm::perspective(glm::radians(90.0f), GLfloat(gWidth / gHeight), 0.1f, 200.f);
-
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube2.program_id], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMatCube2));
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube2.program_id], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatCube2Inv));
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube2.program_id], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMatCube2));
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube2.program_id], "viewingMat"), 1, GL_FALSE, glm::value_ptr(viewMatrixCube2));
-    glUniform3fv(glGetUniformLocation(gProgram[cube2.program_id], "cubeColor"), 1, glm::value_ptr(color2));
-    cube2.draw();
-
-    glUseProgram(gProgram[cube3.program_id]);
-
-    glm::vec3 color3;
-    if (yellow_index == 2)
-    {
-        color3 = YELLOW;
-    }
-    else
-    {
-        color3 = RED;
-    }
-
-    glm::mat4 cubeTranslate3 = glm::translate(glm::mat4(1.0), glm::vec3(-10.f, 0.f, -150.f));
-
-    glm::mat4 modelMatCube3 = tempMove1 * cubeTranslate3 * matRyCube1 * matSCube1;
-
-    glm::mat4 viewMatrixCube3 = glm::translate(glm::mat4(1.0), glm::vec3(0, -5, cubeZ));
-
-    glm::mat4 modelMatCube3Inv = glm::transpose(glm::inverse(modelMatCube3));
-    glm::mat4 perspMatCube3 = glm::perspective(glm::radians(90.0f), GLfloat(gWidth / gHeight), 0.1f, 200.f);
-
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube3.program_id], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMatCube3));
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube3.program_id], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatCube3Inv));
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube3.program_id], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMatCube3));
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[cube3.program_id], "viewingMat"), 1, GL_FALSE, glm::value_ptr(viewMatrixCube3));
-    glUniform3fv(glGetUniformLocation(gProgram[cube3.program_id], "cubeColor"), 1, glm::value_ptr(color3));
-    cube3.draw();
-
-    speed_up += 0.0005f;
-    quadZ -= speed_up;
-    cubeZ += speed_up;
-
-    if (direction == RIGHT)
-    {
-        if (cubeZ - 150 > -76 && cubeZ - 150 < -74.f)
-        {
-            if (yellow_index == 1)
-            {
-                cout << "You got a point!" << endl;
-                score += 1000;
-                cout << "Your score is " << score << endl;
-            }
-            else
-            {
-                cout << "You lost a point!" << endl;
-                score -= 1000;
-                cout << "Your score is " << score << endl;
-            }
-        }
-    }
-    else if (direction == LEFT)
-    {
-        if (cubeZ - 150 > -76 && cubeZ - 150 < -74.f)
-        {
-            if (yellow_index == 2)
-            {
-                cout << "You got a point!" << endl;
-                score += 1000;
-                cout << "Your score is " << score << endl;
-            }
-            else
-            {
-                cout << "You lost a point!" << endl;
-                score -= 1000;
-                cout << "Your score is " << score << endl;
-            }
-        }
-    }
-    else
-    {
-        if (cubeZ - 150 > -76 && cubeZ - 150 < -74.f)
-        {
-            if (yellow_index == 0)
-            {
-                cout << "You got a point!" << endl;
-                score += 1000;
-                cout << "Your score is " << score << endl;
-            }
-            else
-            {
-                cout << "You lost a point!" << endl;
-                score -= 1000;
-                cout << "Your score is " << score << endl;
-            }
-        }
-    }
     // it is hardcoding, but it works (change!)
-    if (cubeZ > 75)
+    if (cubeZ > 76)
     {
-        cout << "cubeZ = " << cubeZ - 150 << endl;
-        cout << "quadZ = " << quadZ << endl;
-        cout << accumulatior << endl;
         // pick yellow cube
         yellow_index = generateAndPrintRandomFloats();
         cubeZ = 0;
         cubeY = 0;
         cubeX = 0;
+        draw_flag = -1;
     }
 
-    score += 1 + jump_multiplier;
+    if (!deadFlag)
+    {
+        speed_up += 0.0005f;
+        quadZ -= speed_up;
+        cubeZ += speed_up;
+        score += 1 + jump_multiplier;
+    }
+
     float scaleX = static_cast<float>(gWidth) / 1024;
     float scaleY = static_cast<float>(gHeight) / 800;
     float scale = 1 * std::min(scaleX, scaleY);
@@ -1115,11 +1149,11 @@ void reshape(GLFWwindow *window, int w, int h)
 
 void keyboard(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+    if (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_Q && action == GLFW_PRESS)
     {
         glfwSetWindowShouldClose(window, GL_TRUE);
     }
-    else if (key == GLFW_KEY_A && action == GLFW_PRESS)
+    else if (!deadFlag && key == GLFW_KEY_A && action == GLFW_PRESS)
     {
         switch (direction)
         {
@@ -1137,7 +1171,7 @@ void keyboard(GLFWwindow *window, int key, int scancode, int action, int mods)
         // Update the translation matrix to move the object left
         // translateX -= 5;
     }
-    else if (key == GLFW_KEY_D && action == GLFW_PRESS)
+    else if (!deadFlag && key == GLFW_KEY_D && action == GLFW_PRESS)
     {
         switch (direction)
         {
@@ -1169,66 +1203,66 @@ void keyboard(GLFWwindow *window, int key, int scancode, int action, int mods)
         cubeY = 0;
         cubeX = 0;
     }
-    else if (key == GLFW_KEY_P && action == GLFW_PRESS)
-    {
-        cubeX += 0.5;
-        cout << "cubeX = " << cubeX << endl;
-    }
-    else if (key == GLFW_KEY_0 && action == GLFW_PRESS)
-    {
-        cubeX -= 0.5;
-        cout << "cubeX = " << cubeX << endl;
-    }
-    else if (key == GLFW_KEY_O && action == GLFW_PRESS)
-    {
-        cubeY += 0.5;
-        cout << "cubeY = " << cubeY << endl;
-    }
-    else if (key == GLFW_KEY_9 && action == GLFW_PRESS)
-    {
-        cubeY -= 0.5;
-        cout << "cubeY = " << cubeY << endl;
-    }
-    else if (key == GLFW_KEY_I && action == GLFW_PRESS)
-    {
-        cubeZ += 0.5;
-        cout << "cubeZ = " << cubeZ << endl;
-    }
-    else if (key == GLFW_KEY_8 && action == GLFW_PRESS)
-    {
-        cubeZ -= 0.5;
-        cout << "cubeZ = " << cubeZ << endl;
-    }
-    else if (key == GLFW_KEY_X && action == GLFW_PRESS)
-    {
-        quadX += 0.1;
-        cout << "quadX = " << quadX << endl;
-    }
-    else if (key == GLFW_KEY_3 && action == GLFW_PRESS)
-    {
-        quadX -= 0.1;
-        cout << "quadX = " << quadX << endl;
-    }
-    else if (key == GLFW_KEY_Y && action == GLFW_PRESS)
-    {
-        quadY += 0.1;
-        cout << "quadY = " << quadY << endl;
-    }
-    else if (key == GLFW_KEY_4 && action == GLFW_PRESS)
-    {
-        quadY -= 0.1;
-        cout << "quadY = " << quadY << endl;
-    }
-    else if (key == GLFW_KEY_Z && action == GLFW_PRESS)
-    {
-        quadZ += 1;
-        cout << "quadZ = " << quadZ << endl;
-    }
-    else if (key == GLFW_KEY_5 && action == GLFW_PRESS)
-    {
-        quadZ -= 1;
-        cout << "quadZ = " << quadZ << endl;
-    }
+    // else if (key == GLFW_KEY_P && action == GLFW_PRESS)
+    // {
+    //     cout << "cubeX = " << cubeX << endl;
+    //     cout << "cubeY = " << cubeY << endl;
+    //     cout << "cubeZ = " << cubeZ << endl;
+
+    //     cout << "quadX = " << quadX << endl;
+    //     cout << "quadY = " << quadY << endl;
+    //     cout << "quadZ = " << quadZ << endl;
+    // }
+    // else if (key == GLFW_KEY_O && action == GLFW_PRESS)
+    // {
+    //     cubeY += 0.5;
+    //     cout << "cubeY = " << cubeY << endl;
+    // }
+    // else if (key == GLFW_KEY_9 && action == GLFW_PRESS)
+    // {
+    //     cubeY -= 0.5;
+    //     cout << "cubeY = " << cubeY << endl;
+    // }
+    // else if (key == GLFW_KEY_I && action == GLFW_PRESS)
+    // {
+    //     cubeZ += 0.5;
+    //     cout << "cubeZ = " << cubeZ << endl;
+    // }
+    // else if (key == GLFW_KEY_8 && action == GLFW_PRESS)
+    // {
+    //     cubeZ -= 0.5;
+    //     cout << "cubeZ = " << cubeZ << endl;
+    // }
+    // else if (key == GLFW_KEY_X && action == GLFW_PRESS)
+    // {
+    //     quadX += 0.1;
+    //     cout << "quadX = " << quadX << endl;
+    // }
+    // else if (key == GLFW_KEY_3 && action == GLFW_PRESS)
+    // {
+    //     quadX -= 0.1;
+    //     cout << "quadX = " << quadX << endl;
+    // }
+    // else if (key == GLFW_KEY_Y && action == GLFW_PRESS)
+    // {
+    //     quadY += 0.1;
+    //     cout << "quadY = " << quadY << endl;
+    // }
+    // else if (key == GLFW_KEY_4 && action == GLFW_PRESS)
+    // {
+    //     quadY -= 0.1;
+    //     cout << "quadY = " << quadY << endl;
+    // }
+    // else if (key == GLFW_KEY_Z && action == GLFW_PRESS)
+    // {
+    //     quadZ += 1;
+    //     cout << "quadZ = " << quadZ << endl;
+    // }
+    // else if (key == GLFW_KEY_5 && action == GLFW_PRESS)
+    // {
+    //     quadZ -= 1;
+    //     cout << "quadZ = " << quadZ << endl;
+    // }
 }
 
 void mainLoop(GLFWwindow *window)
